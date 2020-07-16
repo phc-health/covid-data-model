@@ -90,8 +90,8 @@ class ModelFitter:
         t_delta_phases=30,  # number of days between second and third ramps
         limit_t_delta_phases=[14, 100],  # good as of June 3, 2020 may need to update in the future
         error_t_delta_phases=1,
-        test_fraction=0.1,
-        limit_test_fraction=[0.02, 1],
+        test_fraction=0.2,
+        limit_test_fraction=[0.1, 0.5],
         error_test_fraction=0.02,
         hosp_fraction=0.7,
         limit_hosp_fraction=[0.25, 1],
