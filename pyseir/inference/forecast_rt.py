@@ -146,7 +146,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 20
-        self.n_epochs = 1000
+        self.n_epochs = 20
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -285,7 +285,8 @@ class ForecastRt:
                 - 1
             )
             test_samples = df_samples[first_test_index:]
-            if self.save_csv_output:
+            if 1 == 0:
+                # if self.save_csv_output:
                 for i in range(len(train_samples_not_spaced)):
                     df = train_samples_not_spaced[i]
                     if self.save_csv_output:
@@ -312,7 +313,8 @@ class ForecastRt:
             train_samples = df_samples_spaced[:train_set_length]
             test_samples = df_samples_spaced[train_set_length:]
 
-            if self.save_csv_output:
+            if 1 == 0:
+                # if self.save_csv_output:
                 for i in range(len(train_samples_not_spaced)):
                     df = train_samples_not_spaced[i]
                     if self.save_csv_output:
@@ -406,6 +408,7 @@ class ForecastRt:
         # Get scaling dictionary
         # TODO add max min rows to avoid domain adaption issues
         train_scaling_set = pd.concat(area_scaling_samples)
+        train_scaling_set.to_csv("train_scaling_set.csv")
         scalers_dict = self.get_scaling_dictionary(slim(train_scaling_set, self.forecast_variables))
 
         if self.debug_plots:
@@ -606,6 +609,7 @@ class ForecastRt:
             plt.figure(figsize=(18, 12))
             fips = train_df[0]["fips"][0]  # here
             state_name = us.states.lookup(fips).name
+            log.info(f"{state_name}--------------------------------------")
             forecasts_train, dates_train, unscaled_forecasts_train = self.get_forecasts(
                 train_df, train_X, train_Y, scalers_dict, forecast_model
             )
@@ -922,7 +926,7 @@ class ForecastRt:
             Y = df.iloc[-self.predict_days :, :]
 
             # fips = X['fips_int'][0]
-            # if fips==-1:
+            # if fips==2:
             #  X.to_csv(self.csv_output_folder + label + '_X_' + str(fips) + '_' +  str(i) + '.csv')
             #  Y.to_csv(self.csv_output_folder + label + '_Y_' + str(fips) + '_' + str(i) + '.csv')
 
@@ -995,19 +999,23 @@ class MyHyperModel(HyperModel):
                         self.train_sequence_length,
                         self.n_features,
                     ),
+                    activation="sigmoid",
                     stateful=True,
                     return_sequences=True,
                 )
             )
+        log.info("added")
         model.add(
             LSTM(
                 n_hidden_layer_dimensions,
                 batch_input_shape=(self.batch_size, self.train_sequence_length, self.n_features),
+                activation="sigmoid",
                 stateful=True,
             )
         )
+        log.info("added last lstm layer")
         model.add(Dropout(dropout))
-        model.add(Dense(self.predict_sequence_length))
+        model.add(Dense(self.predict_sequence_length, activation="sigmoid"))
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=3)
         model.compile(loss="mae", optimizer="adam", metrics=["mae", "mape"])
 
@@ -1057,6 +1065,7 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
             unscaled_j = scalers_dict[predict_variable].inverse_transform(j.reshape(1, -1))
             unscaled_error_sum += abs(unscaled_i - unscaled_j)
             mape = 100 * (abs(unscaled_i - unscaled_j) / unscaled_i)
+            # log.info(f'truth: {unscaled_i} truth_scaled: {i} prediction: {unscaled_j} prediction_scaled: {j} mape: {mape}')
         map_errors.append(mape)
         sample_errors.append(error_sum)
         unscaled_sample_errors.append(unscaled_error_sum)
@@ -1066,13 +1075,10 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
 
     scaled_error = sum(sample_errors) / (len(sample_errors))
 
-    log.info("forecast")
-    log.info(forecast)
-    log.info("truth")
-    log.info(Y)
     log.info("map errors")
     log.info(map_errors)
     average_mape = sum(map_errors) / (len(map_errors))
+    log.info(average_mape)
     return (
         float(scaled_error),
         float(total_unscaled_error),

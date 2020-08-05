@@ -10,6 +10,10 @@ import us
 import structlog
 from functools import reduce
 
+# import covidcast
+# data2 = covidcast.signal("safegraph","full_time_work_prop", None, None, "state")
+# data2 = covidcast.signal("safegraph","part_time_work_prop", None, None, "state")
+
 CSV_FOLDER = (
     "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-public/data/aws-lake/"
 )
@@ -17,7 +21,7 @@ aggregate_level_name = "aggregate_level"
 aggregate_select = "state"
 
 # load CAN input data
-#can_data = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/pyseir_data/merged_results.csv"
+# can_data = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/pyseir_data/merged_results.csv"
 can_data = "/Users/natashawoods/Desktop/covid-data-model/data/timeseries.csv"
 can_df = pd.read_csv(can_data, converters={"fips": str}, parse_dates=True, index_col="date")
 
