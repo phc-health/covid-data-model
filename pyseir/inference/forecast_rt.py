@@ -99,8 +99,10 @@ class ForecastRt:
             "raw_wcli",
             "raw_wili",
             "unsmoothed_community",
-            "full_mobility",
-            "part_mobility",
+            "median_home_dwell_time_prop",
+            "full_time_work_prop",
+            "part_time_work_prop",
+            "completely_home_prop",
         ]
         self.forecast_variables = [
             self.predict_variable,
@@ -108,11 +110,13 @@ class ForecastRt:
             f"smooth_{self.daily_death_var}",
             "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
             # "Rt_MAP__new_cases",
+            "smooth_median_home_dwell_time_prop",
+            "smooth_full_time_work_prop",
+            "smooth_part_time_work_prop",
+            "smooth_completely_home_prop",
             self.fips_var_name_int,
-            "full_mobility",
-            "part_mobility",
             "smooth_contact_tracers_count",  # number of contacts traced
-            "smoothed_cli",
+            "smoothed_cli",  # estimated percentage of covid doctor visits
             "smoothed_hh_cmnty_cli",
             "smoothed_nohh_cmnty_cli",
             "smoothed_ili",
@@ -237,13 +241,15 @@ class ForecastRt:
                     center=0,
                     cmap=sns.diverging_palette(20, 220, n=200),
                     square=True,
+                    annot=True,
+                    annot_kws={"size": 4},
                 )
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=45, horizontalalignment="right")
                 plt.savefig(
                     self.csv_output_folder + us.states.lookup(state_name).name + "_corr.pdf",
                     bbox_inches="tight",
                 )
-
+                """
                 plt.close("all")
                 axs = pd.plotting.scatter_matrix(df_slim)
                 n = len(df_slim.columns)
@@ -262,7 +268,7 @@ class ForecastRt:
                     self.csv_output_folder + us.states.lookup(state_name).name + "_scatter.pdf",
                     bbox_inches="tight",
                 )
-
+                """
             if self.save_csv_output:
                 df_forecast.to_csv(self.csv_output_folder + df["state"][0] + "_forecast.csv")
                 df.to_csv(self.csv_output_folder + df["state"][0] + "_OG_forecast.csv")
