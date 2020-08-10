@@ -153,8 +153,8 @@ class ForecastRt:
         self.percent_train = True
         self.train_size = 0.8
         self.n_test_days = 10
-        self.n_batch = 10
-        self.n_epochs = 1000
+        self.n_batch = 40
+        self.n_epochs = 2
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -444,8 +444,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 1
-        skip_test = 0
+        skip_train = 9
+        skip_test = 12
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]

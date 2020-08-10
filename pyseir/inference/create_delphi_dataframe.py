@@ -15,13 +15,14 @@ import os, sys
 # data2 = covidcast.signal("safegraph","full_time_work_prop", None, None, "state")
 # data2 = covidcast.signal("safegraph","part_time_work_prop", None, None, "state")
 
-CSV_FOLDER = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-public/data/aws-lake/using/"
+CSV_REFORMAT_FOLDER = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/delphi/hard_format/"
+CSV_FOLDER = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/delphi/easy_format/"
 aggregate_level_name = "aggregate_level"
 aggregate_select = "state"
 
 # load CAN input data
 # can_data = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/pyseir_data/merged_results.csv"
-can_data = "/Users/natashawoods/Desktop/covid-data-model/data/timeseries.csv"
+can_data = "/Users/natashawoods/Desktop/merged_results_2020_08_06.csv"
 can_df = pd.read_csv(can_data, converters={"fips": str}, parse_dates=True, index_col="date")
 
 
@@ -31,32 +32,33 @@ delphi_dataframes = []
 full_time_safegraph = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/pyseir_data/state_full_time_work_prop.csv"
 part_time_safegraph = "/Users/natashawoods/Desktop/later.nosync/covid_act_now.nosync/covid-data-model/pyseir_data/state_part_time_work_prop.csv"
 
-full_df = pd.read_csv(full_time_safegraph, parse_dates=True)
-full_df["fips"] = full_df.apply(lambda x: us.states.lookup(x["geo_value"]).fips, axis=1)
-full_df.rename(columns={"time_value": "date", "value": "full_mobility"}, inplace=True)
-full_df["aggregate_level"] = "state"
-full_df["state"] = full_df.apply(lambda x: x["geo_value"].upper(), axis=1)
-full_df.to_csv("full_mobility.csv")
-os.system(f"mv full_mobility.csv {CSV_FOLDER}")
-# full_df.index = full_df['date']
-print(full_df.columns)
-print(full_df.head())
-# full_df.drop('date', inplace = True)
+reformat_csv_files = glob.glob(CSV_REFORMAT_FOLDER + "*csv")
+for thisfile in reformat_csv_files:
+    var_name = thisfile[thisfile.rfind("/") + 1 : -4]
+    print(var_name)
+    full_df = pd.read_csv(thisfile, parse_dates=True)
+    full_df["fips"] = full_df.apply(lambda x: us.states.lookup(x["geo_value"]).fips, axis=1)
+    full_df.rename(columns={"time_value": "date", "value": var_name}, inplace=True)
+    full_df["aggregate_level"] = "state"
+    full_df["state"] = full_df.apply(lambda x: x["geo_value"].upper(), axis=1)
+    full_df.to_csv(f"{var_name}.csv")
+    os.system(f"mv {var_name}.csv {CSV_FOLDER}")
+    print(full_df.columns)
+    print(full_df.head())
+    # full_df.drop('date', inplace = True)
 
 
-part_df = pd.read_csv(part_time_safegraph, parse_dates=True)
-part_df["fips"] = part_df.apply(lambda x: us.states.lookup(x["geo_value"]).fips, axis=1)
-part_df.rename(columns={"time_value": "date", "value": "part_mobility"}, inplace=True)
-part_df["aggregate_level"] = "state"
-part_df["state"] = part_df.apply(lambda x: x["geo_value"].upper(), axis=1)
-part_df.to_csv("part_mobility.csv")
-part_df.to_csv("part_mobility.csv")
-os.system(f"mv part_mobility.csv {CSV_FOLDER}")
+# part_df = pd.read_csv(part_time_safegraph, parse_dates=True)
+# part_df["fips"] = part_df.apply(lambda x: us.states.lookup(x["geo_value"]).fips, axis=1)
+# part_df.rename(columns={"time_value": "date", "value": "part_mobility"}, inplace=True)
+# part_df["aggregate_level"] = "state"
+# part_df["state"] = part_df.apply(lambda x: x["geo_value"].upper(), axis=1)
+# part_df.to_csv("part_mobility.csv")
+# part_df.to_csv("part_mobility.csv")
+# os.system(f"mv part_mobility.csv {CSV_FOLDER}")
 # part_df.index = part_df['date']
 # part_df.drop('date', inplace = True)
 
-
-print(full_df.head())
 
 # delphi_dataframes.append(full_df)
 # delphi_dataframes.append(part_df)
