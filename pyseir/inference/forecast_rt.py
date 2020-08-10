@@ -1033,7 +1033,7 @@ class MyHyperModel(HyperModel):
         model.add(Dropout(dropout))
         model.add(Dense(self.predict_sequence_length, activation="sigmoid"))
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=3)
-        model.compile(loss="mae", optimizer="adam", metrics=["mae", "mape"])
+        model.compile(loss="mape", optimizer="adam", metrics=["mae", "mape"])
 
         return model
 
