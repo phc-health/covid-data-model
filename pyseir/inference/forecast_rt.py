@@ -107,14 +107,18 @@ class ForecastRt:
         ]
         self.forecast_variables = [
             self.predict_variable,
+            "Rt_MAP__new_cases",
             f"smooth_{self.daily_case_var}",
             f"smooth_{self.daily_death_var}",
             "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
-            "Rt_MAP__new_cases",
             "smooth_median_home_dwell_time_prop",
             "smooth_full_time_work_prop",
             "smooth_part_time_work_prop",
             "smooth_completely_home_prop",
+            "d_smooth_median_home_dwell_time_prop",
+            "d_smooth_full_time_work_prop",
+            "d_smooth_part_time_work_prop",
+            "d_smooth_completely_home_prop",
             self.fips_var_name_int,
             "smooth_contact_tracers_count",  # number of contacts traced
             "smoothed_cli",  # estimated percentage of covid doctor visits
@@ -143,7 +147,7 @@ class ForecastRt:
         # Seq2Seq Parameters
         self.max_scaling = 2  # multiply max feature values by this number for scaling set
         self.min_scaling = 0.5  # multiply min feature values by this number of scaling set
-        self.days_between_samples = 7
+        self.days_between_samples = 1
         self.mask_value = -10
         self.min_number_of_days = 31
         self.sequence_length = (
@@ -154,7 +158,7 @@ class ForecastRt:
         self.percent_train = True
         self.train_size = 0.8
         self.n_test_days = 10
-        self.n_batch = 20
+        self.n_batch = 40
         self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
@@ -203,6 +207,7 @@ class ForecastRt:
 
             for var in self.smooth_variables:
                 df[f"smooth_{var}"] = df.iloc[:][var].rolling(window=self.window_size).mean()
+                df[f"d_smooth_{var}"] = df[f"smooth_{var}"].diff()
             # Calculate average of predict variable
             indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=self.window_size)
             df[self.predict_variable] = (
@@ -214,11 +219,12 @@ class ForecastRt:
 
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
-            df = df[first_valid_index:].copy()
+            last_valid_index = df[self.predict_variable].last_valid_index()
+            df = df[first_valid_index:last_valid_index].copy()
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
-            df = df[1:-5]
+            df = df[1:]
             df[self.fips_var_name_int] = df[self.fips_var_name].astype(int)
             df[self.sim_date_name] = (df.index - self.ref_date).days + 1
 
@@ -251,7 +257,6 @@ class ForecastRt:
                     self.csv_output_folder + us.states.lookup(state_name).name + "_corr.pdf",
                     bbox_inches="tight",
                 )
-                """
                 plt.close("all")
                 axs = pd.plotting.scatter_matrix(df_slim)
                 n = len(df_slim.columns)
@@ -270,7 +275,6 @@ class ForecastRt:
                     self.csv_output_folder + us.states.lookup(state_name).name + "_scatter.pdf",
                     bbox_inches="tight",
                 )
-                """
             if self.save_csv_output:
                 df_forecast.to_csv(self.csv_output_folder + df["state"][0] + "_forecast.csv")
                 df.to_csv(self.csv_output_folder + df["state"][0] + "_OG_forecast.csv")
@@ -359,7 +363,7 @@ class ForecastRt:
             plt.grid(which="both", alpha=0.5)
             output_path = get_run_artifact_path(state, RunArtifact.FORECAST_VAR_UNSCALED)
             plt.title(us.states.lookup(state).name)
-            plt.savefig(output_path, bbox_inches="tight")
+            # plt.savefig(output_path, bbox_inches="tight")
 
             fig2, ax2 = plt.subplots(figsize=(18, 12))
             # for var, color in zip(self.forecast_variables, col):
@@ -446,8 +450,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 9
-        skip_test = 9
+        skip_train = 14
+        skip_test = 25
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]
