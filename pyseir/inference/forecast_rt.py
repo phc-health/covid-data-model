@@ -52,7 +52,7 @@ class ForecastRt:
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
         self.states = "All"  # All to use All
-        #self.csv_path = "./pyseir_data/merged_delphi_df.csv"
+        # self.csv_path = "./pyseir_data/merged_delphi_df.csv"
         self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas
@@ -155,7 +155,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 40
-        self.n_epochs = 2
+        self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
