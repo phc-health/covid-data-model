@@ -143,7 +143,7 @@ class ForecastRt:
         # Seq2Seq Parameters
         self.max_scaling = 2  # multiply max feature values by this number for scaling set
         self.min_scaling = 0.5  # multiply min feature values by this number of scaling set
-        self.days_between_samples = 1
+        self.days_between_samples = 7
         self.mask_value = -10
         self.min_number_of_days = 31
         self.sequence_length = (
@@ -154,7 +154,7 @@ class ForecastRt:
         self.percent_train = True
         self.train_size = 0.8
         self.n_test_days = 10
-        self.n_batch = 40
+        self.n_batch = 20
         self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
@@ -447,7 +447,7 @@ class ForecastRt:
         final_list_test_Y = np.concatenate(list_test_Y)
 
         skip_train = 9
-        skip_test = 12
+        skip_test = 9
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]
@@ -1029,7 +1029,7 @@ class MyHyperModel(HyperModel):
         model.add(Dropout(dropout))
         model.add(Dense(self.predict_sequence_length, activation="sigmoid"))
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=3)
-        model.compile(loss="mape", optimizer="adam", metrics=["mae", "mape"])
+        model.compile(loss="mae", optimizer="adam", metrics=["mae", "mape"])
 
         return model
 
