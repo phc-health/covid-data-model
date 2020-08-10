@@ -52,7 +52,8 @@ class ForecastRt:
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
         self.states = "All"  # All to use All
-        self.csv_path = "./pyseir_data/merged_delphi_df.csv"
+        #self.csv_path = "./pyseir_data/merged_delphi_df.csv"
+        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
