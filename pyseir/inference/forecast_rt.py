@@ -52,7 +52,6 @@ class ForecastRt:
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
         self.states = "All"  # All to use All
-        # self.csv_path = "./pyseir_data/merged_delphi_df.csv"
         self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas
@@ -85,6 +84,7 @@ class ForecastRt:
         self.predict_var_input_feature = (
             False  # set to true to include predict variable in input data
         )
+        self.window_size = 7
         self.smooth_variables = [
             self.daily_case_var,
             self.daily_death_var,
@@ -110,7 +110,7 @@ class ForecastRt:
             f"smooth_{self.daily_case_var}",
             f"smooth_{self.daily_death_var}",
             "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
-            # "Rt_MAP__new_cases",
+            "Rt_MAP__new_cases",
             "smooth_median_home_dwell_time_prop",
             "smooth_full_time_work_prop",
             "smooth_part_time_work_prop",
@@ -202,14 +202,15 @@ class ForecastRt:
             df["new_negative_tests"] = df["negative_tests"].diff()
 
             for var in self.smooth_variables:
-                df[f"smooth_{var}"] = df.iloc[:][var].rolling(window=5).mean()
+                df[f"smooth_{var}"] = df.iloc[:][var].rolling(window=self.window_size).mean()
             # Calculate average of predict variable
-            indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=5)
+            indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=self.window_size)
             df[self.predict_variable] = (
                 df.iloc[:][self.raw_predict_variable].rolling(window=indexer).mean()
             )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
             # Calculate Rt derivative, exclude first row since-- zero derivative
             df[self.d_predict_variable] = df[self.predict_variable].diff()
+            # df.to_csv("inputs.csv", columns = [self.predict_variable, "new_cases"] )
 
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
