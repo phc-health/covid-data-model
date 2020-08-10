@@ -527,8 +527,8 @@ class ForecastRt:
             self.predict_days,
         )
 
-        log.info("train scaled error")
-        log.info(train_scaled_average_error)
+        # log.info("train scaled error")
+        # log.info(train_scaled_average_error)
 
         plt.close("all")
         fig, ax = plt.subplots()
@@ -540,12 +540,12 @@ class ForecastRt:
         plt.legend()
         plt.title("MAE vs. Epochs")
 
-        log.info("train scaled average error")
-        log.info(train_scaled_average_error)
-        log.info("total error")
-        log.info(train_unscaled_total_error)
-        log.info("ave error")
-        log.info(train_unscaled_average_error)
+        # log.info("train scaled average error")
+        # log.info(train_scaled_average_error)
+        # log.info("total error")
+        # log.info(train_unscaled_total_error)
+        # log.info("ave error")
+        # log.info(train_unscaled_average_error)
         textstr = "\n".join(
             (
                 "MAE",
