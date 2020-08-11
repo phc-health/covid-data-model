@@ -26,6 +26,9 @@ from tensorflow.keras.callbacks import EarlyStopping
 from kerastuner import HyperModel
 from kerastuner.tuners import RandomSearch
 
+# Custom Loss Function
+import keras.backend as K
+
 # Feature processing
 from pandas.core.window.indexers import (
     BaseIndexer,
@@ -1033,9 +1036,13 @@ class MyHyperModel(HyperModel):
         model.add(Dropout(dropout))
         model.add(Dense(self.predict_sequence_length, activation="sigmoid"))
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=3)
-        model.compile(loss="mape", optimizer="adam", metrics=["mae", "mape"])
+        model.compile(loss=smape, optimizer="adam", metrics=["mae", "mape"])
 
         return model
+
+
+def smape(y_true, y_pred):
+    return 100 * K.mean(abs(y_true - y_pred) / (abs(y_true) + abs(y_pred)) / 2)
 
 
 def slim(dataframe_input, variables):
