@@ -1,9 +1,10 @@
+from typing import Optional
 import math
 from datetime import timedelta
 import logging
 import structlog
-from typing import Optional
 
+from covidactnow.datapublic.common_fields import CommonFields
 import numpy as np
 import pandas as pd
 from scipy import stats as sps
@@ -22,7 +23,8 @@ def run_rt_for_fips(
     include_deaths: bool = False,
     include_testing_correction: bool = False,
     figure_collector: Optional[list] = None,
-):
+    save_run_artifact: bool = True,
+) -> Optional[pd.DataFrame]:
     """Entry Point for Infer Rt"""
 
     # TODO: This fails silently if you pass it a numeric fips instead of a string
@@ -50,12 +52,17 @@ def run_rt_for_fips(
 
     # Generate the output DataFrame (consider renaming the function infer_all to be clearer)
     output_df = engine.infer_all()
+    if output_df is None:
+        rt_log.warning(event="Infer Rt returned no result", fips=fips)
+        return
 
     # Save the output to json for downstream repacking and incorporation.
-    if output_df is not None and not output_df.empty:
+    if not output_df.empty and save_run_artifact:
         output_path = get_run_artifact_path(fips, RunArtifact.RT_INFERENCE_RESULT)
         output_df.to_json(output_path)
-    return output_df
+
+    output_df[str(CommonFields.FIPS)] = fips
+    return output_df.reset_index()
 
 
 def _get_display_name(fips: str) -> str:

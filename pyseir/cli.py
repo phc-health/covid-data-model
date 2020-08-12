@@ -1,13 +1,15 @@
 from typing import Dict, List
-
-
+import itertools
 import sys
 import os
 import click
 import us
+import pathlib
 import logging
 import pandas as pd
+import structlog
 from covidactnow.datapublic import common_init
+from covidactnow.datapublic import common_df
 
 from multiprocessing import Pool
 from functools import partial
@@ -22,7 +24,7 @@ from pyseir.inference.whitelist_generator import WhitelistGenerator
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))
 
-root = logging.getLogger()
+root = structlog.getLogger()
 
 DEFAULT_RUN_MODE = "can-inference-derived"
 ALL_STATES = [state_obj.abbr for state_obj in us.STATES] + ["PR"]
@@ -47,10 +49,20 @@ def _generate_whitelist():
     gen.generate_whitelist()
 
 
-def _run_infer_rt(states: List[str], states_only=False):
-    for state in states:
-        fips = us.states.lookup(state).fips
-        infer_rt.run_rt_for_fips(fips)
+def _run_infer_rt(states: List[str], states_only=False, output_path: pathlib.Path = None):
+    state_fips = [us.states.lookup(state).fips for state in states]
+
+    rt_results = []
+    with Pool(maxtasksperchild=1) as pool:
+        state_dfs = pool.map(infer_rt.run_rt_for_fips, state_fips)
+        rt_results.extend(data for data in state_dfs if data is not None)
+        if not states_only:
+            fips_per_state = build_counties_to_run_per_state(states)
+            county_dfs = pool.map(infer_rt.run_rt_for_fips, fips_per_state.keys())
+            rt_results.extend(data for data in county_dfs if data is not None)
+
+    if output_path:
+        common_df.write_csv(pd.concat(rt_results), output_path, root)
 
 
 def _run_mle_fits(states: List[str], states_only=False):
@@ -206,9 +218,13 @@ def generate_whitelist():
     "--state", help="State to generate files for. If no state is given, all states are computed."
 )
 @click.option("--states-only", default=False, is_flag=True, type=bool, help="Only model states")
-def run_infer_rt(state, states_only):
+@click.option("--output-path", type=pathlib.Path, help="Output path to write infer rt results")
+@click.option("--skip-whitelist", is_flag=True)
+def run_infer_rt(state, states_only, output_path, skip_whitelist):
+    if not skip_whitelist:
+        _generate_whitelist()
     states = [state] if state else ALL_STATES
-    _run_infer_rt(states, states_only=states_only)
+    _run_infer_rt(states, states_only=states_only, output_path=output_path)
 
 
 @entry_point.command()
