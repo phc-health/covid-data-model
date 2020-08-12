@@ -29,6 +29,9 @@ from kerastuner.tuners import RandomSearch
 # Custom Loss Function
 import keras.backend as K
 
+# Compute lag
+from scipy import signal
+
 # Feature processing
 from pandas.core.window.indexers import (
     BaseIndexer,
@@ -158,11 +161,11 @@ class ForecastRt:
         )
         self.sample_train_length = 30  # Set to -1 to use all historical data
         self.predict_days = 1
-        self.percent_train = True
+        self.percent_train = False
         self.train_size = 0.8
         self.n_test_days = 10
-        self.n_batch = 40
-        self.n_epochs = 1000
+        self.n_batch = 50
+        self.n_epochs = 2
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -227,6 +230,7 @@ class ForecastRt:
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
+
             df = df[1:]
             df[self.fips_var_name_int] = df[self.fips_var_name].astype(int)
             df[self.sim_date_name] = (df.index - self.ref_date).days + 1
@@ -242,7 +246,9 @@ class ForecastRt:
             df_forecast_list.append(df_forecast)
             df_list.append(df)
             df_slim = slim(df_forecast, self.forecast_variables)
-            if self.debug_plots:
+
+            if 1 == 0:
+                # if self.debug_plots:
                 corr = df_slim.corr()
                 plt.close("all")
                 ax = sns.heatmap(
@@ -286,7 +292,7 @@ class ForecastRt:
 
     def get_train_test_samples(self, df_forecast):
         # True if test samples are constrained to be latest samples
-        test_set_end_of_sample = False
+        test_set_end_of_sample = True
 
         # create list of dataframe samples
         df_samples = self.create_samples(df_forecast)
@@ -370,6 +376,7 @@ class ForecastRt:
 
             fig2, ax2 = plt.subplots(figsize=(18, 12))
             # for var, color in zip(self.forecast_variables, col):
+            scaled_variables = {}
             for i in range(len(self.forecast_variables)):
                 if i % 2 == 0:
                     lstyle = "solid"
@@ -381,6 +388,7 @@ class ForecastRt:
                 color = col[i]
                 reshaped_data = df[var].values.reshape(-1, 1)
                 scaled_values = scalers_dict[var].transform(reshaped_data)
+                scaled_variables[var] = scaled_values
                 # ax2.plot(scaled_values, label=var, color=color)
                 if var != self.predict_variable and var != self.daily_case_var:
                     ax2.plot(scaled_values, label=var, color=color, linewidth=1, linestyle=lstyle)
@@ -400,6 +408,26 @@ class ForecastRt:
             plt.savefig(output_path, bbox_inches="tight")
 
             plt.close("all")
+
+            # log.info('scaled values dictionary')
+            # log.info(scaled_variables)
+
+            """
+            for var, values in scaled_variables.items():
+              log.info(var)
+              log.info(values)
+              log.info(self.predict_variable)
+              log.info(scaled_values[self.predict_variable])
+              lag = align_time_series(values, scaled_values[self.predict_variable])
+              plt.close('all')
+              plt.plot(values, label = var)
+              plt.plot(scaled_values, label = self.predict_variable)
+              plt.legend()
+              plt.title(us.states.lookup(state).name)
+              plt.xticks(rotation=30, fontsize=14)
+              plt.savefig(self.csv_output_folder + us.states.lookup(state).name+ var + '.pdf')
+              log.info(f'{var} lag: {lag}')
+            """
 
         return
 
@@ -453,8 +481,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 14
-        skip_test = 25
+        skip_train = 29
+        skip_test = 10
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]
@@ -1023,7 +1051,6 @@ class MyHyperModel(HyperModel):
                     return_sequences=True,
                 )
             )
-        log.info("added")
         model.add(
             LSTM(
                 n_hidden_layer_dimensions,
@@ -1032,7 +1059,6 @@ class MyHyperModel(HyperModel):
                 stateful=True,
             )
         )
-        log.info("added last lstm layer")
         model.add(Dropout(dropout))
         model.add(Dense(self.predict_sequence_length, activation="sigmoid"))
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=3)
@@ -1108,6 +1134,41 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
         float(average_unscaled_error),
         float(average_mape),
     )
+
+
+def align_time_series(series_a, series_b):
+    """
+  Identify the optimal time shift between two data series based on
+  maximal cross-correlation of their derivatives.
+
+  Parameters
+  ----------
+  series_a: pd.Series
+  Reference series to cross-correlate against.
+  series_b: pd.Series
+  Reference series to shift and cross-correlate against.
+
+  Returns
+  -------
+  shift: int
+  A shift period applied to series b that aligns to series a
+  """
+    shifts = range(-21, 21)
+    valid_shifts = []
+    xcor = []
+    np.random.seed(42)  # Xcor has some stochastic FFT elements.
+    _series_a = np.diff(series_a)
+
+    for i in shifts:
+        series_b_shifted = np.diff(series_b.shift(i))
+        valid = ~np.isnan(_series_a) & ~np.isnan(series_b_shifted)
+        if len(series_b_shifted[valid]) > 0:
+            xcor.append(signal.correlate(_series_a[valid], series_b_shifted[valid]).mean())
+            valid_shifts.append(i)
+    if len(valid_shifts) > 0:
+        return valid_shifts[np.argmax(xcor)]
+    else:
+        return 0
 
 
 def external_run_forecast():
