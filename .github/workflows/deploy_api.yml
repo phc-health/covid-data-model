@@ -9,6 +9,7 @@ name: Build & Publish API snapshot to data.covidactnow.org
 #######################################################################################
 
 on:
+  push:
   repository_dispatch:
     types: publish-api
 
@@ -33,7 +34,7 @@ env:
   COVID_MODEL_CORES: 96
 
   # Used by python code that reports errors to sentry.
-  SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+  SENTRY_DSN: "" # ${{ secrets.SENTRY_DSN }}
 
   # use a webhook to write to slack channel dev-alerts for QA
   SLACK_DEV_ALERTS_WEBHOOK: ${{ secrets.SLACK_DEV_ALERTS_WEBHOOK }}
