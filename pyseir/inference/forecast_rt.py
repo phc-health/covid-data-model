@@ -117,28 +117,28 @@ class ForecastRt:
         self.forecast_variables = [
             self.predict_variable,
             f"smooth_{self.daily_case_var}",
-            # "Rt_MAP__new_cases",
-            # f"smooth_{self.daily_death_var}",
-            # "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
-            # "smooth_median_home_dwell_time_prop",
-            # "smooth_full_time_work_prop",
-            # "smooth_part_time_work_prop",
-            # "smooth_completely_home_prop",
-            # "d_smooth_median_home_dwell_time_prop",
-            # "d_smooth_full_time_work_prop",
-            # "d_smooth_part_time_work_prop",
-            # "d_smooth_completely_home_prop",
-            # self.fips_var_name_int,
-            # "smooth_contact_tracers_count",  # number of contacts traced
-            # "smoothed_cli",  # estimated percentage of covid doctor visits
-            # "smoothed_hh_cmnty_cli",
-            # "smoothed_nohh_cmnty_cli",
-            # "smoothed_ili",
-            # "smoothed_wcli",
-            # "smoothed_wili",
-            # "smoothed_search",  # smoothed google health trends da
-            # "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
-            # "nmf_day_doc_fbs_ght",
+            "Rt_MAP__new_cases",
+            f"smooth_{self.daily_death_var}",
+            "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
+            "smooth_median_home_dwell_time_prop",
+            "smooth_full_time_work_prop",
+            "smooth_part_time_work_prop",
+            "smooth_completely_home_prop",
+            "d_smooth_median_home_dwell_time_prop",
+            "d_smooth_full_time_work_prop",
+            "d_smooth_part_time_work_prop",
+            "d_smooth_completely_home_prop",
+            self.fips_var_name_int,
+            "smooth_contact_tracers_count",  # number of contacts traced
+            "smoothed_cli",  # estimated percentage of covid doctor visits
+            "smoothed_hh_cmnty_cli",
+            "smoothed_nohh_cmnty_cli",
+            "smoothed_ili",
+            "smoothed_wcli",
+            "smoothed_wili",
+            "smoothed_search",  # smoothed google health trends da
+            "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
+            "nmf_day_doc_fbs_ght",
             # Not using variables below
             # "smooth_raw_cli",  # fb raw covid like illness
             # "smooth_raw_ili",  # fb raw flu like illness
@@ -865,25 +865,26 @@ class ForecastRt:
         dates = list()
         regr_prediction = list()
         actuals = list()
+        do_linear = True
         for df, x, y in zip(df_list, X_list, Y_list):
-            n_days = 10  # number of previous datapoints used in linear interpolation
-            predict_out_days = 7  # how many days out to predict
+            if do_linear:
+                n_days = 10  # number of previous datapoints used in linear interpolation
+                predict_out_days = 7  # how many days out to predict
 
-            df_linear = df.tail(n_days).reset_index(drop=True)
-            df_linear_test = df.tail(1)
-            df_linear.to_csv("dftest.csv")
-            # exit()
-            df_linear_train = df_linear.head(n_days)
-            train_X = df_linear_train.index.to_numpy().reshape(-1, 1)
-            train_Y = df_linear_train["smooth_new_cases"].to_numpy().reshape(-1, 1)
-            actuals.append(int(df_linear_test["smooth_future_new_cases"]))
-            regr = linear_model.LinearRegression()
-            regr.fit(train_X, train_Y)
-            regr_prediction.append(
-                regr.predict(train_X[len(train_X) - 1].reshape(1, -1)) + predict_out_days
-            )
+                df_linear = df.tail(n_days).reset_index(drop=True)
+                df_linear_test = df.tail(1)
+                df_linear.to_csv("dftest.csv")
+                # exit()
+                df_linear_train = df_linear.head(n_days)
+                train_X = df_linear_train.index.to_numpy().reshape(-1, 1)
+                train_Y = df_linear_train["smooth_new_cases"].to_numpy().reshape(-1, 1)
+                actuals.append(int(df_linear_test["smooth_future_new_cases"]))
+                regr = linear_model.LinearRegression()
+                regr.fit(train_X, train_Y)
+                regr_prediction.append(
+                    regr.predict(train_X[len(train_X) - 1].reshape(1, -1)) + predict_out_days
+                )
             x = x.reshape(1, x.shape[0], x.shape[1])
-            # scaled_df = pd.DataFrame(np.squeeze(x))
             unscaled_prediction = model.predict(x)
             thisforecast = scalers_dict[self.predict_variable].inverse_transform(
                 unscaled_prediction
@@ -891,7 +892,6 @@ class ForecastRt:
             forecasts.append(thisforecast)
             unscaled_predictions.append(unscaled_prediction)
 
-            # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             dates.append(df.iloc[-self.predict_days :].index)
 
         # plt.plot(dates, np.array(regr_prediction).reshape(-1,1), label = "prediction", marker = "*")
