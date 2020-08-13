@@ -37,6 +37,7 @@ def run_rt_for_fips(
         include_testing_correction=include_testing_correction,
         include_deaths=include_deaths,
         figure_collector=figure_collector,
+        plot=plot,
     )
     if input_df.dropna().empty:
         rt_log.warning(event="Infer Rt Skipped. No Data Passed Filter Requirements:", fips=fips)
@@ -76,6 +77,7 @@ def _generate_input_data(
     include_testing_correction: bool,
     include_deaths: bool,
     figure_collector: Optional[list],
+    plot: bool = True,
 ):
     """
     Allow the RtInferenceEngine to be agnostic to aggregation level by handling the loading first
@@ -96,6 +98,7 @@ def _generate_input_data(
         figure_collector=figure_collector,
         display_name=fips,
         log=rt_log.new(fips=fips),
+        plot=plot,
     )
     return df
 
@@ -106,6 +109,7 @@ def filter_and_smooth_input_data(
     include_deaths: bool,
     figure_collector: Optional[list],
     log: logging.Logger,
+    plot: bool = True,
 ) -> pd.DataFrame:
     """Do Filtering Here Before it Gets to the Inference Engine"""
     MIN_CUMULATIVE_COUNTS = dict(cases=20, deaths=10)
@@ -143,7 +147,7 @@ def filter_and_smooth_input_data(
             requirements.append(True)
 
         if all(requirements):
-            if column == "cases":
+            if column == "cases" and plot:
                 fig = plt.figure(figsize=(10, 6))
                 ax = fig.add_subplot(111)  # plt.axes
                 ax.set_yscale("log")
@@ -303,8 +307,9 @@ class RtInferenceEngine:
             b = max(1.0, math.sqrt(self.scale_sigma_from_count / timeseries_scale))
 
         use_sigma = min(a, b) * self.default_process_sigma
-
-        process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
+        # process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
+        # print(norm)
+        process_matrix = sps.norm.pdf(self.r_list[:, None], loc=self.r_list, scale=use_sigma)
 
         # process_matrix applies gaussian smoothing to the previous posterior to make the prior.
         # But when the gaussian is wide much of its distribution function can be outside of the
