@@ -63,7 +63,7 @@ def _run_infer_rt(states: List[str], states_only=False, output_path: str = None)
 
         if not states_only:
             fips_per_state = build_counties_to_run_per_state([state])
-            with Pool(maxtasksperchild=1) as pool:
+            with Pool(40) as pool:
                 county_dfs = pool.map(infer_rt.run_rt_for_fips, fips_per_state.keys())
                 state_results.extend(data for data in county_dfs if data is not None)
 

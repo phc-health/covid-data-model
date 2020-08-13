@@ -439,7 +439,6 @@ class RtInferenceEngine:
         # (5) Iteratively apply Bayes' rule
         loop_idx = 0
         for previous_day, current_day in zip(timeseries.index[:-1], timeseries.index[1:]):
-
             # Keep track of exponential moving average of scale of counts of timeseries
             scale = 0.9 * scale + 0.1 * timeseries[current_day]
 
