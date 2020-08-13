@@ -57,7 +57,7 @@ class ActualsTimeseriesRow(Actuals):
     date: datetime.date = pydantic.Field(..., descrition="Date of timeseries data point")
 
 
-class MetricsTimeseriesRow(Actuals):
+class MetricsTimeseriesRow(Metrics):
     """Metrics data for a specific day."""
 
     date: datetime.date = pydantic.Field(..., descrition="Date of timeseries data point")

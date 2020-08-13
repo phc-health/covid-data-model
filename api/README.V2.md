@@ -363,6 +363,38 @@ Summary of metrics.
 | icuHeadroom    | number |               |
 | contactsTraced | number |               |
 
+### MetricsTimeseriesRow
+Metrics data for a specific day.
+
+| name           | type   | description   |
+|----------------|--------|---------------|
+| dailyNewCases  | number |               |
+| infectionRate  | number |               |
+| testPositivity | number |               |
+| icuHeadroom    | number |               |
+| contactsTraced | number |               |
+| date           | string |               |
+
+### MetricsTimeseriesRowWithHeader
+Prediction timeseries row with location information.
+
+| name            | type   | description                                   |
+|-----------------|--------|-----------------------------------------------|
+| dailyNewCases   | number |                                               |
+| infectionRate   | number |                                               |
+| testPositivity  | number |                                               |
+| icuHeadroom     | number |                                               |
+| contactsTraced  | number |                                               |
+| date            | string |                                               |
+| countryName     | string |                                               |
+| stateName       | string | The state name                                |
+| countyName      | string | The county name                               |
+| intervention    | string | Name of high-level intervention in-place      |
+| fips            | string | Fips for State + County. Five character code  |
+| lat             | number | Latitude of point within the state or county  |
+| long            | number | Longitude of point within the state or county |
+| lastUpdatedDate | string | Date of latest data                           |
+
 ### Actuals
 Known actuals data.
 
@@ -395,48 +427,6 @@ Actual data for a specific day.
 | ventilators        | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
 | contactTracers     | integer                                                     | # of Contact Tracers                                                             |
 | date               | string                                                      |                                                                                  |
-
-### MetricsTimeseriesRow
-Metrics data for a specific day.
-
-| name               | type                                                        | description                                                                      |
-|--------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------|
-| casesTotal         | integer                                                     | Number of confirmed or suspected cases                                           |
-| deathsTotal        | integer                                                     | Number of deaths that are suspected or confirmed to have been caused by COVID-19 |
-| positiveTestsTotal | integer                                                     |                                                                                  |
-| negativeTestsTotal | integer                                                     |                                                                                  |
-| testsTotal         | integer                                                     |                                                                                  |
-| cumulativeDeaths   | integer                                                     | Number of deaths so far                                                          |
-| hospitalBeds       | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| icuBeds            | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| ventilators        | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| contactTracers     | integer                                                     | # of Contact Tracers                                                             |
-| date               | string                                                      |                                                                                  |
-
-### MetricsTimeseriesRowWithHeader
-Prediction timeseries row with location information.
-
-| name               | type                                                        | description                                                                      |
-|--------------------|-------------------------------------------------------------|----------------------------------------------------------------------------------|
-| casesTotal         | integer                                                     | Number of confirmed or suspected cases                                           |
-| deathsTotal        | integer                                                     | Number of deaths that are suspected or confirmed to have been caused by COVID-19 |
-| positiveTestsTotal | integer                                                     |                                                                                  |
-| negativeTestsTotal | integer                                                     |                                                                                  |
-| testsTotal         | integer                                                     |                                                                                  |
-| cumulativeDeaths   | integer                                                     | Number of deaths so far                                                          |
-| hospitalBeds       | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| icuBeds            | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| ventilators        | [HospitalResourceUtilization](#HospitalResourceUtilization) | Base model for API output.                                                       |
-| contactTracers     | integer                                                     | # of Contact Tracers                                                             |
-| date               | string                                                      |                                                                                  |
-| countryName        | string                                                      |                                                                                  |
-| stateName          | string                                                      | The state name                                                                   |
-| countyName         | string                                                      | The county name                                                                  |
-| intervention       | string                                                      | Name of high-level intervention in-place                                         |
-| fips               | string                                                      | Fips for State + County. Five character code                                     |
-| lat                | number                                                      | Latitude of point within the state or county                                     |
-| long               | number                                                      | Longitude of point within the state or county                                    |
-| lastUpdatedDate    | string                                                      | Date of latest data                                                              |
 
 ### RegionSummary
 Summary of actual and prediction data for a single region.
