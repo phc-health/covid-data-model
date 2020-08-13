@@ -68,8 +68,8 @@ def _run_infer_rt(states: List[str], states_only=False, output_path: str = None)
                 state_results.extend(data for data in county_dfs if data is not None)
 
         if output_path and state_results:
-            output_path = pathlib.Path(output_path.format(state=state))
-            common_df.write_csv(pd.concat(state_results), output_path, root)
+            path = pathlib.Path(output_path.format(state=state))
+            common_df.write_csv(pd.concat(state_results), path, root)
 
 
 def _run_mle_fits(states: List[str], states_only=False):
