@@ -23,7 +23,8 @@ def run_rt_for_fips(
     include_deaths: bool = False,
     include_testing_correction: bool = False,
     figure_collector: Optional[list] = None,
-    save_run_artifact: bool = True,
+    save_run_artifact: bool = False,
+    plot: bool = False,
 ) -> Optional[pd.DataFrame]:
     """Entry Point for Infer Rt"""
 
@@ -51,7 +52,7 @@ def run_rt_for_fips(
     )
 
     # Generate the output DataFrame (consider renaming the function infer_all to be clearer)
-    output_df = engine.infer_all()
+    output_df = engine.infer_all(plot=plot)
     if output_df is None:
         rt_log.warning(event="Infer Rt returned no result", fips=fips)
         return
