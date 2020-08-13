@@ -87,7 +87,7 @@ jobs:
 
     - name: Build Model Results (run.sh .. .. execute_model)
       run: |
-        pyseir run-infer-rt --output-path /data/api-results-${{env.SNAPSHOT_ID}}/infer_rt_results.csv
+        pyseir run-infer-rt --output-path /data/api-results-${{env.SNAPSHOT_ID}}/infer_rt_results_{state}.csv
 
     - name: Zip Model Results (run.sh .. .. execute_zip_folder)
       run: ./covid-data-model/run.sh ./covid-data-public /data/api-results-${{env.SNAPSHOT_ID}} execute_zip_folder

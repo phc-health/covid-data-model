@@ -49,20 +49,27 @@ def _generate_whitelist():
     gen.generate_whitelist()
 
 
-def _run_infer_rt(states: List[str], states_only=False, output_path: pathlib.Path = None):
-    state_fips = [us.states.lookup(state).fips for state in states]
+def _run_infer_rt(states: List[str], states_only=False, output_path: str = None):
+    # state_fips = [us.states.lookup(state).fips for state in states]
 
     rt_results = []
-    with Pool(maxtasksperchild=1) as pool:
-        state_dfs = pool.map(infer_rt.run_rt_for_fips, state_fips)
-        rt_results.extend(data for data in state_dfs if data is not None)
-        if not states_only:
-            fips_per_state = build_counties_to_run_per_state(states)
-            county_dfs = pool.map(infer_rt.run_rt_for_fips, fips_per_state.keys())
-            rt_results.extend(data for data in county_dfs if data is not None)
+    for state in states:
+        root.info("Running infer Rt for state", state=state)
+        state_results = []
+        state_fips = us.states.lookup(state).fips
+        state_df = infer_rt.run_rt_for_fips(state_fips)
+        if state_df is not None:
+            state_results.append(state_df)
 
-    if output_path:
-        common_df.write_csv(pd.concat(rt_results), output_path, root)
+        if not states_only:
+            fips_per_state = build_counties_to_run_per_state([state])
+            with Pool(maxtasksperchild=1) as pool:
+                county_dfs = pool.map(infer_rt.run_rt_for_fips, fips_per_state.keys())
+                state_results.extend(data for data in county_dfs if data is not None)
+
+        if output_path and state_results:
+            output_path = pathlib.Path(output_path.format(state=state))
+            common_df.write_csv(pd.concat(state_results), output_path, root)
 
 
 def _run_mle_fits(states: List[str], states_only=False):
@@ -218,7 +225,7 @@ def generate_whitelist():
     "--state", help="State to generate files for. If no state is given, all states are computed."
 )
 @click.option("--states-only", default=False, is_flag=True, type=bool, help="Only model states")
-@click.option("--output-path", type=pathlib.Path, help="Output path to write infer rt results")
+@click.option("--output-path", type=str, help="Output path to write infer rt results")
 @click.option("--skip-whitelist", is_flag=True)
 def run_infer_rt(state, states_only, output_path, skip_whitelist):
     if not skip_whitelist:
