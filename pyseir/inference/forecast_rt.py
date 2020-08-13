@@ -39,6 +39,9 @@ from pandas.core.window.indexers import (
     VariableOffsetWindowIndexer,
 )
 
+# Linear Regression
+from sklearn import linear_model
+
 # Aesthetics
 from cycler import cycler
 import seaborn as sns
@@ -113,29 +116,29 @@ class ForecastRt:
         ]
         self.forecast_variables = [
             self.predict_variable,
-            "Rt_MAP__new_cases",
             f"smooth_{self.daily_case_var}",
-            f"smooth_{self.daily_death_var}",
-            "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
-            "smooth_median_home_dwell_time_prop",
-            "smooth_full_time_work_prop",
-            "smooth_part_time_work_prop",
-            "smooth_completely_home_prop",
-            "d_smooth_median_home_dwell_time_prop",
-            "d_smooth_full_time_work_prop",
-            "d_smooth_part_time_work_prop",
-            "d_smooth_completely_home_prop",
-            self.fips_var_name_int,
-            "smooth_contact_tracers_count",  # number of contacts traced
-            "smoothed_cli",  # estimated percentage of covid doctor visits
-            "smoothed_hh_cmnty_cli",
-            "smoothed_nohh_cmnty_cli",
-            "smoothed_ili",
-            "smoothed_wcli",
-            "smoothed_wili",
-            "smoothed_search",  # smoothed google health trends da
-            "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
-            "nmf_day_doc_fbs_ght",
+            # "Rt_MAP__new_cases",
+            # f"smooth_{self.daily_death_var}",
+            # "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
+            # "smooth_median_home_dwell_time_prop",
+            # "smooth_full_time_work_prop",
+            # "smooth_part_time_work_prop",
+            # "smooth_completely_home_prop",
+            # "d_smooth_median_home_dwell_time_prop",
+            # "d_smooth_full_time_work_prop",
+            # "d_smooth_part_time_work_prop",
+            # "d_smooth_completely_home_prop",
+            # self.fips_var_name_int,
+            # "smooth_contact_tracers_count",  # number of contacts traced
+            # "smoothed_cli",  # estimated percentage of covid doctor visits
+            # "smoothed_hh_cmnty_cli",
+            # "smoothed_nohh_cmnty_cli",
+            # "smoothed_ili",
+            # "smoothed_wcli",
+            # "smoothed_wili",
+            # "smoothed_search",  # smoothed google health trends da
+            # "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
+            # "nmf_day_doc_fbs_ght",
             # Not using variables below
             # "smooth_raw_cli",  # fb raw covid like illness
             # "smooth_raw_ili",  # fb raw flu like illness
@@ -221,7 +224,8 @@ class ForecastRt:
             )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
             # Calculate Rt derivative, exclude first row since-- zero derivative
             df[self.d_predict_variable] = df[self.predict_variable].diff()
-            # df.to_csv("inputs.csv", columns = [self.predict_variable, "new_cases"] )
+            # df.to_csv("inputs.csv", columns = [self.predict_variable, "new_cases", "smooth_new_cases", "smooth_future_new_cases"] )
+            # exit()
 
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
@@ -435,7 +439,7 @@ class ForecastRt:
         """
         predict r_t for 14 days into the future
         Parameters
-        df_all: dataframe with dates, new_cases, new_deaths, and r_t values
+        df_all: dataframe with dates, new_cases, other specified features
         Potential todo: add more features #ALWAYS
         Returns
         dates and forecast r_t values
@@ -455,7 +459,7 @@ class ForecastRt:
         # Get scaling dictionary
         # TODO add max min rows to avoid domain adaption issues
         train_scaling_set = pd.concat(area_scaling_samples)
-        train_scaling_set.to_csv("train_scaling_set.csv")
+        # train_scaling_set.to_csv("train_scaling_set.csv")
         scalers_dict = self.get_scaling_dictionary(slim(train_scaling_set, self.forecast_variables))
 
         if self.debug_plots:
@@ -564,9 +568,6 @@ class ForecastRt:
             self.predict_days,
         )
 
-        # log.info("train scaled error")
-        # log.info(train_scaled_average_error)
-
         plt.close("all")
         fig, ax = plt.subplots()
         ax.plot(history.history["loss"], color="blue", linestyle="solid", label="MAE Train Set")
@@ -575,14 +576,8 @@ class ForecastRt:
         )
 
         plt.legend()
-        plt.title("MAE vs. Epochs")
+        plt.title("Loss vs. Epochs")
 
-        # log.info("train scaled average error")
-        # log.info(train_scaled_average_error)
-        # log.info("total error")
-        # log.info(train_unscaled_total_error)
-        # log.info("ave error")
-        # log.info(train_unscaled_average_error)
         textstr = "\n".join(
             (
                 "MAE",
@@ -607,7 +602,7 @@ class ForecastRt:
             bbox=props,
         )
         plt.xlabel("Epochs")
-        plt.ylabel("MAE")
+        plt.ylabel("Loss")
         output_path = get_run_artifact_path("01", RunArtifact.FORECAST_LOSS)
         plt.savefig(output_path, bbox_inches="tight")
         plt.close("all")
@@ -654,15 +649,24 @@ class ForecastRt:
             area_df_list,
         ):
             plt.figure(figsize=(18, 12))
+            log.info("getting fips")
             fips = train_df[0]["fips"][0]  # here
+            log.info(fips)
             state_name = us.states.lookup(fips).name
-            log.info(f"{state_name}--------------------------------------")
-            forecasts_train, dates_train, unscaled_forecasts_train = self.get_forecasts(
-                train_df, train_X, train_Y, scalers_dict, forecast_model
-            )
-            forecasts_test, dates_test, unscaled_forecasts_test = self.get_forecasts(
-                test_df, test_X, test_Y, scalers_dict, forecast_model
-            )
+            # get linear prediction
+
+            (
+                forecasts_train,
+                dates_train,
+                unscaled_forecasts_train,
+                regression_predictions_train,
+            ) = self.get_forecasts(train_df, train_X, train_Y, scalers_dict, forecast_model)
+            (
+                forecasts_test,
+                dates_test,
+                unscaled_forecasts_test,
+                regression_predictions_test,
+            ) = self.get_forecasts(test_df, test_X, test_Y, scalers_dict, forecast_model)
             (
                 train_scaled_average_error,
                 train_unscaled_total_error,
@@ -702,6 +706,28 @@ class ForecastRt:
                     markersize=5,
                     marker="*",
                 )
+                plt.plot(
+                    np.squeeze(dates_train),
+                    np.squeeze(regression_predictions_train),
+                    color="purple",
+                    label="linear train",
+                    marker="*",
+                )
+                plt.plot(
+                    np.squeeze(dates_test),
+                    np.squeeze(regression_predictions_test),
+                    color="blue",
+                    label="linear test",
+                    marker="*",
+                )
+                log.info("train Y")
+                log.info(train_Y)
+                log.info("linear forecast")
+                log.info(regression_predictions_train)
+                mae_train = np.mean(tf.keras.losses.MAE(train_Y, regression_predictions_train))
+                mape_train = np.mean(tf.keras.losses.MAPE(train_Y, regression_predictions_train))
+                mae_test = np.mean(tf.keras.losses.MAE(test_Y, regression_predictions_test))
+                mape_test = np.mean(tf.keras.losses.MAPE(test_Y, regression_predictions_test))
                 plt.plot(
                     np.squeeze(dates_test),
                     np.squeeze(forecasts_test),
@@ -774,12 +800,16 @@ class ForecastRt:
                 "patience": self.patience,
                 "validation split": self.validation_split,
                 "mask value": self.mask_value,
-                "train total error": train_unscaled_total_error,
-                "train avg error": train_unscaled_average_error,
-                "train avg mape": train_mape_average,
-                "test total error": test_unscaled_total_error,
-                "test avg error": test_unscaled_average_error,
-                "test avg mape": test_mape_average,
+                "train total MAE": train_unscaled_total_error,
+                "test total MAE": test_unscaled_total_error,
+                "train avg MAE": train_unscaled_average_error,
+                "train linear MAE": mae_train,
+                "train avg MAPE": train_mape_average,
+                "train linear MAPE": mape_train,
+                "test avg MAE": test_unscaled_average_error,
+                "test linear MAE": mae_test,
+                "test avg MAPE": test_mape_average,
+                "test linear MAPE": mape_test,
             }
             for i, (k, v) in enumerate(seq_params_dict.items()):
 
@@ -823,7 +853,19 @@ class ForecastRt:
         unscaled_predictions = list()
         forecasts = list()
         dates = list()
+        regr_prediction = list()
+        actuals = list()
         for df, x, y in zip(df_list, X_list, Y_list):
+            n_days = 10
+            df_linear = df.tail(n_days).reset_index(drop=True)
+            df_linear_train = df_linear.head(n_days - 1)
+            df_linear_test = df_linear.tail(1)
+            train_X = df_linear_train.index.to_numpy().reshape(-1, 1)
+            train_Y = df_linear_train["smooth_new_cases"].to_numpy().reshape(-1, 1)
+            actuals.append(int(df_linear_test["smooth_new_cases"]))
+            regr = linear_model.LinearRegression()
+            regr.fit(train_X, train_Y)
+            regr_prediction.append(regr.predict(train_X[len(train_X) - 1].reshape(1, -1)))
             x = x.reshape(1, x.shape[0], x.shape[1])
             # scaled_df = pd.DataFrame(np.squeeze(x))
             unscaled_prediction = model.predict(x)
@@ -836,7 +878,11 @@ class ForecastRt:
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             dates.append(df.iloc[-self.predict_days :].index)
 
-        return forecasts, dates, unscaled_predictions
+        # plt.plot(dates, np.array(regr_prediction).reshape(-1,1), label = "prediction", marker = "*")
+        # plt.plot(dates, np.array(actuals), label = "data", marker = "*")
+        # plt.legend()
+        # plt.savefig('reg_fit.pdf')
+        return forecasts, dates, unscaled_predictions, np.array(regr_prediction)
 
     def get_scaling_dictionary(self, train_scaling_set):
         scalers_dict = {}
@@ -1124,8 +1170,6 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
 
     scaled_error = sum(sample_errors) / (len(sample_errors))
 
-    log.info("map errors")
-    log.info(map_errors)
     average_mape = sum(map_errors) / (len(map_errors))
     log.info(average_mape)
     return (
