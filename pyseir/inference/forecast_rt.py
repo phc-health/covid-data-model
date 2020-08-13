@@ -866,16 +866,22 @@ class ForecastRt:
         regr_prediction = list()
         actuals = list()
         for df, x, y in zip(df_list, X_list, Y_list):
-            n_days = 10
+            n_days = 10  # number of previous datapoints used in linear interpolation
+            predict_out_days = 7  # how many days out to predict
+
             df_linear = df.tail(n_days).reset_index(drop=True)
-            df_linear_train = df_linear.head(n_days - 1)
-            df_linear_test = df_linear.tail(1)
+            df_linear_test = df.tail(1)
+            df_linear.to_csv("dftest.csv")
+            # exit()
+            df_linear_train = df_linear.head(n_days)
             train_X = df_linear_train.index.to_numpy().reshape(-1, 1)
             train_Y = df_linear_train["smooth_new_cases"].to_numpy().reshape(-1, 1)
-            actuals.append(int(df_linear_test["smooth_new_cases"]))
+            actuals.append(int(df_linear_test["smooth_future_new_cases"]))
             regr = linear_model.LinearRegression()
             regr.fit(train_X, train_Y)
-            regr_prediction.append(regr.predict(train_X[len(train_X) - 1].reshape(1, -1)))
+            regr_prediction.append(
+                regr.predict(train_X[len(train_X) - 1].reshape(1, -1)) + predict_out_days
+            )
             x = x.reshape(1, x.shape[0], x.shape[1])
             # scaled_df = pd.DataFrame(np.squeeze(x))
             unscaled_prediction = model.predict(x)
