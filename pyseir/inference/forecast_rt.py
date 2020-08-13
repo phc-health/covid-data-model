@@ -168,7 +168,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1000
+        self.n_epochs = 1
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -724,10 +724,20 @@ class ForecastRt:
                 log.info(train_Y)
                 log.info("linear forecast")
                 log.info(regression_predictions_train)
-                mae_train = np.mean(tf.keras.losses.MAE(train_Y, regression_predictions_train))
-                mape_train = np.mean(tf.keras.losses.MAPE(train_Y, regression_predictions_train))
-                mae_test = np.mean(tf.keras.losses.MAE(test_Y, regression_predictions_test))
-                mape_test = np.mean(tf.keras.losses.MAPE(test_Y, regression_predictions_test))
+                train_predic = scalers_dict[self.predict_variable].inverse_transform(
+                    train_Y.reshape(1, -1)
+                )
+                test_predic = scalers_dict[self.predict_variable].inverse_transform(
+                    test_Y.reshape(1, -1)
+                )
+                log.info("unscaled train y")
+                log.info(train_predic)
+                mae_train = np.mean(tf.keras.losses.MAE(train_predic, regression_predictions_train))
+                mape_train = np.mean(
+                    tf.keras.losses.MAPE(train_predic, regression_predictions_train)
+                )
+                mae_test = np.mean(tf.keras.losses.MAE(test_predic, regression_predictions_test))
+                mape_test = np.mean(tf.keras.losses.MAPE(test_predic, regression_predictions_test))
                 plt.plot(
                     np.squeeze(dates_test),
                     np.squeeze(forecasts_test),
