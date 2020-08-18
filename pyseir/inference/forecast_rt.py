@@ -32,6 +32,9 @@ import keras.backend as K
 # Compute lag
 from scipy import signal
 
+# 2d bins statistics
+from scipy.stats import binned_statistic
+
 # Feature processing
 from pandas.core.window.indexers import (
     BaseIndexer,
@@ -66,8 +69,8 @@ class ForecastRt:
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
         self.ref_date = datetime(year=2020, month=1, day=1)
-        self.debug_plots = True
-
+        self.debug_plots = False
+        self.debug_output = False
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
         self.state_aggregate_level_name = "state"
@@ -76,6 +79,7 @@ class ForecastRt:
         self.fips_var_name_int = (
             "fips_int"  # name of fips used in forecast (cast from input string to int)
         )
+        self.quick_test = False
         self.sim_date_name = "sim_day"
         self.index_col_name_csv = "date"
         self.cases_cumulative = True
@@ -229,10 +233,12 @@ class ForecastRt:
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
             last_valid_index = df[self.predict_variable].last_valid_index()
-            df_invalid = df[first_valid_index:].copy()
+            df_invalid = df[:-1].copy()  # because last entry is from raw data is NaN TBD
+            if self.quick_test:
+                df = df[first_valid_index:].copy()
+                df = df[:45].copy()
+                self.n_batch = 1
             df = df[first_valid_index:last_valid_index].copy()
-            print(df_invalid["smooth_new_cases"])
-            print(df_invalid["new_cases"])
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
@@ -326,7 +332,7 @@ class ForecastRt:
                     df = test_samples[i]
                     if self.save_csv_output:
                         df.to_csv(self.csv_output_folder + "df" + str(i) + "_test-notspaced.csv")
-            # For training only keep samples that are days_between_samples apart (avoid forecast learning meaningless correlations between labels)
+            # For traning only keep samples that are days_between_samples apart (avoid forecast learning meaningless correlations between labels)
             train_samples = train_samples_not_spaced[0 :: self.days_between_samples]
 
         else:  # test and train set randomly selected from sample set
@@ -369,7 +375,7 @@ class ForecastRt:
             fig, ax = plt.subplots(figsize=(18, 12))
             for var, color in zip(self.forecast_variables, col):
                 if var != self.predict_variable:
-                    ax.plot(df[var], label=var, color=color, linewidth=1)
+                    ax.plot(df.index, df[var], label=var, color=color, linewidth=1)
                 else:
                     ax.plot(df[var], label=var, color="black", linewidth=BOLD_LINEWIDTH)
             ax.legend()
@@ -396,9 +402,17 @@ class ForecastRt:
                 scaled_variables[var] = scaled_values
                 # ax2.plot(scaled_values, label=var, color=color)
                 if var != self.predict_variable and var != self.daily_case_var:
-                    ax2.plot(scaled_values, label=var, color=color, linewidth=1, linestyle=lstyle)
+                    ax2.plot(
+                        df.index,
+                        scaled_values,
+                        label=var,
+                        color=color,
+                        linewidth=1,
+                        linestyle=lstyle,
+                    )
                 else:
                     ax2.plot(
+                        df.index,
                         scaled_values,
                         label=var,
                         color=color,
@@ -409,6 +423,7 @@ class ForecastRt:
             plt.xticks(rotation=30, fontsize=14)
             plt.grid(which="both", alpha=0.5)
             plt.title(us.states.lookup(state).name)
+            plt.ylim(-1, 2)
             output_path = get_run_artifact_path(state, RunArtifact.FORECAST_VAR_SCALED)
             plt.savefig(output_path, bbox_inches="tight")
 
@@ -460,17 +475,17 @@ class ForecastRt:
         # Get scaling dictionary
         # TODO add max min rows to avoid domain adaption issues
         train_scaling_set = pd.concat(area_scaling_samples)
-        # train_scaling_set.to_csv("train_scaling_set.csv")
         scalers_dict = self.get_scaling_dictionary(slim(train_scaling_set, self.forecast_variables))
 
         if self.debug_plots:
             self.plot_variables(
-                slim(area_df_list, self.forecast_variables), area_fips, scalers_dict
+                slim(area_df_invalid_list, self.forecast_variables), area_fips, scalers_dict
             )
 
         # Create scaled train samples
         list_train_X, list_train_Y, list_test_X, list_test_Y = [], [], [], []
         # iterate over train/test_samples = list[state_dfs_samples]
+        log.info("slimming samples")  # THIS IS THE SLOW STEP
         for train, test in zip(area_train_samples, area_test_samples):
             train_filter = slim(train, self.forecast_variables)
             test_filter = slim(test, self.forecast_variables)
@@ -480,7 +495,7 @@ class ForecastRt:
             list_train_Y.append(train_Y)
             list_test_X.append(test_X)
             list_test_Y.append(test_Y)
-
+        log.info("samples slimmed")
         final_list_train_X = np.concatenate(list_train_X)
         final_list_train_Y = np.concatenate(list_train_Y)
         final_list_test_X = np.concatenate(list_test_X)
@@ -488,6 +503,9 @@ class ForecastRt:
 
         skip_train = 29
         skip_test = 10
+        if self.quick_test:
+            skip_train = len(final_list_train_X) - 2
+            skip_test = len(final_list_test_X) - 2
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]
@@ -571,9 +589,9 @@ class ForecastRt:
 
         plt.close("all")
         fig, ax = plt.subplots()
-        ax.plot(history.history["loss"], color="blue", linestyle="solid", label="MAE Train Set")
+        ax.plot(history.history["loss"], color="blue", linestyle="solid", label="Loss Train Set")
         ax.plot(
-            history.history["val_loss"], color="green", linestyle="solid", label="MAE Test Set",
+            history.history["val_loss"], color="green", linestyle="solid", label="Loss Test Set",
         )
 
         plt.legend()
@@ -650,6 +668,13 @@ class ForecastRt:
         train_linear_mae = []
         test_linear_mape = []
         test_linear_mae = []
+
+        train_mape_array = []
+        train_mae_array = []
+        test_mape_array = []
+        test_mae_array = []
+        actuals_train = []
+        actuals_test = []
         for train_df, train_X, train_Y, test_df, test_X, test_Y, area_df, area_df_invalid in zip(
             area_train_samples,
             list_train_X,
@@ -665,19 +690,11 @@ class ForecastRt:
                 slim(test_df[-2:], self.forecast_variables), scalers_dict, "future"
             )
             invalid_dfs = []
-            print("invalidsssss")
-            print(area_df_invalid)
-            print(area_df_invalid[-31:-1])
-            print(area_df_invalid[-30:])
             invalid_dfs.append(area_df_invalid[-31:-1])
             invalid_dfs.append(area_df_invalid[-30:])
             invalid_X, invalid_Y = self.get_scaled_X_Y(
                 slim(invalid_dfs, self.forecast_variables), scalers_dict, "future"
             )
-            print("X")
-            print(future_X)
-            print("Y")
-            print(future_Y)
             (
                 forecast_future,
                 dates_future,
@@ -694,20 +711,19 @@ class ForecastRt:
             ) = self.get_forecasts(
                 invalid_dfs, invalid_X, invalid_Y, scalers_dict, forecast_model, "future"
             )
-            print("invalid dates")
-            print(dates_invalid)
-            print("invalid forecasts")
-            print(forecast_invalid)
-            print("forecast future")
-            print(forecast_future)
-            print(dates_future)
+            if self.debug_output:
+                print("invalid dates")
+                print(dates_invalid)
+                print("invalid forecasts")
+                print(forecast_invalid)
+                print("forecast future")
+                print(forecast_future)
+                print(dates_future)
+
             plt.figure(figsize=(18, 12))
-            log.info("getting fips")
             fips = train_df[0]["fips"][0]  # here
-            log.info(fips)
             state_name = us.states.lookup(fips).name
             # get linear prediction
-
             (
                 forecasts_train,
                 dates_train,
@@ -789,6 +805,15 @@ class ForecastRt:
                     label="linear test",
                     marker="*",
                 )
+                plt.plot(
+                    np.squeeze(dates_test),
+                    np.squeeze(forecasts_test),
+                    color="orange",
+                    label="Test Set",
+                    linewidth=MODEL_LINEWIDTH,
+                    markersize=5,
+                    marker="*",
+                )
                 train_actuals = scalers_dict[self.predict_variable].inverse_transform(
                     train_Y.reshape(1, -1)
                 )
@@ -804,30 +829,34 @@ class ForecastRt:
                 mae_test = np.mean(tf.keras.losses.MAE(test_actuals, regression_predictions_test))
                 mape_test = np.mean(tf.keras.losses.MAPE(test_actuals, regression_predictions_test))
 
-                mae_train_forecast = np.mean(tf.keras.losses.MAE(train_actuals, forecasts_train))
-                mape_train_forecast = np.mean(tf.keras.losses.MAPE(train_actuals, forecasts_train))
-                mae_test_forecast = np.mean(tf.keras.losses.MAE(test_actuals, forecasts_test))
-                mape_test_forecast = np.mean(tf.keras.losses.MAPE(test_actuals, forecasts_test))
+                mae_train_forecast = tf.keras.losses.MAE(train_actuals, forecasts_train)
+                mae_train_forecast_mean = np.mean(mae_train_forecast)
+                mape_train_forecast = tf.keras.losses.MAPE(train_actuals, forecasts_train)
+                mape_train_forecast_mean = np.mean(mape_train_forecast)
 
-                train_mape.append(mape_train_forecast)
-                train_mae.append(mae_train_forecast)
-                test_mape.append(mape_test_forecast)
-                test_mae.append(mae_test_forecast)
+                mae_test_forecast = tf.keras.losses.MAE(test_actuals, forecasts_test)
+                mae_test_forecast_mean = np.mean(mae_test_forecast)
+                mape_test_forecast = tf.keras.losses.MAPE(test_actuals, forecasts_test)
+                mape_test_forecast_mean = np.mean(mape_test_forecast)
+
+                train_mae_array.append(mae_train_forecast)
+                train_mape_array.append(mape_train_forecast)
+                test_mae_array.append(mae_test_forecast)
+                test_mape_array.append(mape_test_forecast)
+
+                train_mape.append(mape_train_forecast_mean)
+                train_mae.append(mae_train_forecast_mean)
+                test_mape.append(mape_test_forecast_mean)
+                test_mae.append(mae_test_forecast_mean)
 
                 train_linear_mape.append(mape_train)
                 train_linear_mae.append(mae_train)
                 test_linear_mape.append(mape_test)
                 test_linear_mae.append(mae_test)
 
-                plt.plot(
-                    np.squeeze(dates_test),
-                    np.squeeze(forecasts_test),
-                    color="orange",
-                    label="Test Set",
-                    linewidth=MODEL_LINEWIDTH,
-                    markersize=5,
-                    marker="*",
-                )
+                actuals_train.append(np.squeeze(train_actuals))
+                actuals_test.append(np.squeeze(test_actuals))
+
             else:
                 for n in range(len(dates_train)):
                     newdates = dates_train[n]
@@ -937,7 +966,6 @@ class ForecastRt:
                     )
 
             plt.title(state_name + ": epochs: " + str(self.n_epochs))
-            # plt.ylim(0.5, 3)
             output_path = get_run_artifact_path(fips, RunArtifact.FORECAST_RESULT)
             state_obj = us.states.lookup(state_name)
             plt.savefig(output_path, bbox_inches="tight")
@@ -955,14 +983,61 @@ class ForecastRt:
         log.info(f"linear train mae: {np.mean(train_linear_mae)}")
         log.info(f"linear test mape: {np.mean(test_linear_mape)}")
         log.info(f"linaer test mae: {np.mean(test_linear_mae)}")
-        # train_mae = []
-        # test_mape = []
-        # test_mae[]
 
-        # train_linear_mape = []
-        # train_linear_mae = []
-        # test_linear_mape = []
-        # test_linear_mae[]
+        # print(train_mae_array)
+        # print(len(train_mae_array))
+        print("actuals")
+        print(actuals_train)
+        print(np.concatenate(actuals_train))
+        print(np.squeeze(np.concatenate(train_mae_array, axis=0)))
+        plt.close("all")
+        plt.scatter(
+            np.concatenate(actuals_train),
+            np.squeeze(np.concatenate(train_mae_array, axis=0)),
+            label="MAE train",
+            s=2,
+            marker="*",
+        )
+        plt.scatter(
+            np.concatenate(actuals_test),
+            np.squeeze(np.concatenate(test_mae_array, axis=0)),
+            label="MAE test",
+            s=2,
+            marker="*",
+        )
+        plt.legend()
+        plt.xlabel(self.predict_variable)
+        plt.ylabel("MAE")
+        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+        plt.savefig(output_path + "_mae_totals.pdf")
+
+        plt.close("all")
+        plt.scatter(
+            np.concatenate(actuals_train),
+            np.squeeze(np.concatenate(train_mape_array, axis=0)),
+            label="MAPE train",
+            s=2,
+            marker="*",
+        )
+        plt.scatter(
+            np.concatenate(actuals_test),
+            np.squeeze(np.concatenate(test_mape_array, axis=0)),
+            label="MAPE test",
+            s=2,
+            marker="*",
+        )
+        plt.legend()
+        plt.xlabel(self.predict_variable)
+        plt.ylabel("MAPE")
+        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+        plt.savefig(output_path + "_mape_totals.pdf")
+
+        # plt.close('all')
+        # plt.plot(np.concatenate(actuals_train), np.concatenate(train_mape_array), label = 'MAPE train', marker = '*', markersize = 5)
+        # plt.plot(np.concatenate(actuals_test), np.concatenate(test_mape_array), label = 'MAPE test', marker = '*', markersize = 5)
+        # output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+        # plt.savefig(output_path + "_mape_totals.pdf")
+
         return
 
     def get_forecasts(self, df_list, X_list, Y_list, scalers_dict, model, label="none"):
@@ -986,8 +1061,6 @@ class ForecastRt:
                 df_linear_train = df_linear.head(n_days - self.predict_days)
                 # labels are the last predict_days rows
                 df_linear_test = df.tail(self.predict_days)
-                df_linear.to_csv("dftest.csv")
-                # exit()
 
                 train_X = df_linear_train.index.to_numpy().reshape(-1, 1)
                 train_Y = df_linear_train["smooth_new_cases"].to_numpy().reshape(-1, 1)
@@ -1032,12 +1105,9 @@ class ForecastRt:
         for sample in samples:
             for columnName, columnData in sample.iteritems():
                 scaled_values = scalers_dict[columnName].transform(columnData.values.reshape(-1, 1))
-                # scaled_values = columnData.values.reshape(-1,1)
                 sample.loc[:, f"{columnName}{self.scaled_variable_suffix}"] = scaled_values
             sample_list.append(sample)
-        # X, Y, df_list = self.get_X_Y(sample_list, label)
         X, Y = self.get_X_Y(sample_list, label)
-        # return X, Y, df_list
         return X, Y
 
     def old_specify_model(
@@ -1284,14 +1354,12 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
                 unscaled_k = scalers_dict[predict_variable].inverse_transform(k.reshape(1, -1))
                 unscaled_l = scalers_dict[predict_variable].inverse_transform(l.reshape(1, -1))
                 unscaled_error_sum += abs(unscaled_k - unscaled_l)
-                # mape.append(100*abs(unscaled_k - unscaled_l)/unscaled_k)
         else:
             error_sum += abs(i - j)
             unscaled_i = scalers_dict[predict_variable].inverse_transform(i.reshape(1, -1))
             unscaled_j = scalers_dict[predict_variable].inverse_transform(j.reshape(1, -1))
             unscaled_error_sum += abs(unscaled_i - unscaled_j)
             mape = 100 * (abs(unscaled_i - unscaled_j) / unscaled_i)
-            # log.info(f'truth: {unscaled_i} truth_scaled: {i} prediction: {unscaled_j} prediction_scaled: {j} mape: {mape}')
         map_errors.append(mape)
         sample_errors.append(error_sum)
         unscaled_sample_errors.append(unscaled_error_sum)
@@ -1302,7 +1370,6 @@ def get_aggregate_errors(X, Y, model, scalers_dict, predict_variable, sequence_l
     scaled_error = sum(sample_errors) / (len(sample_errors))
 
     average_mape = sum(map_errors) / (len(map_errors))
-    log.info(average_mape)
     return (
         float(scaled_error),
         float(total_unscaled_error),
