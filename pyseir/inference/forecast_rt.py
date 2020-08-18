@@ -930,13 +930,13 @@ class ForecastRt:
                 "mask value": self.mask_value,
                 "train total MAE": train_unscaled_total_error,
                 "test total MAE": test_unscaled_total_error,
-                "train MAE": mae_train_forecast,
+                "train MAE": mae_train_forecast_mean,
                 "train linear MAE": mae_train,
-                "train MAPE": mape_train_forecast,
+                "train MAPE": mape_train_forecast_mean,
                 "train linear MAPE": mape_train,
-                "test MAE": mae_test_forecast,
+                "test MAE": mae_test_forecast_mean,
                 "test linear MAE": mae_test,
-                "test MAPE": mape_test_forecast,
+                "test MAPE": mape_test_forecast_mean,
                 "test linear MAPE": mape_test,
             }
             for i, (k, v) in enumerate(seq_params_dict.items()):
