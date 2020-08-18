@@ -169,7 +169,7 @@ class ForecastRt:
         self.n_test_days = 10
         self.n_batch = 50
         self.n_epochs = 1000
-        self.n_hidden_layer_dimensions = 100
+        self.n_hidden_layer_dimensions = 1
         self.dropout = 0
         self.patience = 30
         self.validation_split = 0  # currently using test set as validation set
@@ -202,8 +202,9 @@ class ForecastRt:
         state_df_dictionary = dict(iter(df_states_merge.groupby(self.fips_var_name)))
 
         # process dataframe
-        state_names, df_forecast_list, df_list = [], [], []
+        state_names, df_forecast_list, df_list, df_invalid_list = [], [], [], []
         for state in state_df_dictionary:
+
             df = state_df_dictionary[state]
             state_name = df[self.fips_var_name][0]
 
@@ -224,13 +225,14 @@ class ForecastRt:
             )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
             # Calculate Rt derivative, exclude first row since-- zero derivative
             df[self.d_predict_variable] = df[self.predict_variable].diff()
-            # df.to_csv("inputs.csv", columns = [self.predict_variable, "new_cases", "smooth_new_cases", "smooth_future_new_cases"] )
-            # exit()
 
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
             last_valid_index = df[self.predict_variable].last_valid_index()
+            df_invalid = df[first_valid_index:].copy()
             df = df[first_valid_index:last_valid_index].copy()
+            print(df_invalid["smooth_new_cases"])
+            print(df_invalid["new_cases"])
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
@@ -238,16 +240,15 @@ class ForecastRt:
             df = df[1:]
             df[self.fips_var_name_int] = df[self.fips_var_name].astype(int)
             df[self.sim_date_name] = (df.index - self.ref_date).days + 1
-
-            # df_forecast = df[self.forecast_variables].copy()
-            # Fill empty values with mask value
             df_forecast = df.fillna(self.mask_value)
-            # ignore last entry = NaN #TODO find a better way to do this!!!
-            # Is this necessary? dunno why some states have 0 for last Rt
-            # df_forecast = df_forecast.iloc[:-1]
+
+            df_invalid[self.fips_var_name_int] = df_invalid[self.fips_var_name].astype(int)
+            df_invalid[self.sim_date_name] = (df_invalid.index - self.ref_date).days + 1
+            df_forecast_invalid = df_invalid.fillna(self.mask_value)
 
             state_names.append(state_name)
             df_forecast_list.append(df_forecast)
+            df_invalid_list.append(df_forecast_invalid)
             df_list.append(df)
             df_slim = slim(df_forecast, self.forecast_variables)
 
@@ -292,7 +293,7 @@ class ForecastRt:
                 df_forecast.to_csv(self.csv_output_folder + df["state"][0] + "_forecast.csv")
                 df.to_csv(self.csv_output_folder + df["state"][0] + "_OG_forecast.csv")
 
-        return state_names, df_forecast_list
+        return state_names, df_forecast_list, df_invalid_list
 
     def get_train_test_samples(self, df_forecast):
         # True if test samples are constrained to be latest samples
@@ -445,7 +446,7 @@ class ForecastRt:
         dates and forecast r_t values
         """
         # split merged dataframe into state level dataframes (this includes adding variables and masking nan values)
-        area_fips, area_df_list = self.get_forecast_dfs()
+        area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs()
 
         # get train, test, and scaling samples per state and append to list
         area_scaling_samples, area_train_samples, area_test_samples = [], [], []
@@ -649,7 +650,7 @@ class ForecastRt:
         train_linear_mae = []
         test_linear_mape = []
         test_linear_mae = []
-        for train_df, train_X, train_Y, test_df, test_X, test_Y, area_df in zip(
+        for train_df, train_X, train_Y, test_df, test_X, test_Y, area_df, area_df_invalid in zip(
             area_train_samples,
             list_train_X,
             list_train_Y,
@@ -657,7 +658,47 @@ class ForecastRt:
             list_test_X,
             list_test_Y,
             area_df_list,
+            area_df_invalid_list,
         ):
+
+            future_X, future_Y = self.get_scaled_X_Y(
+                slim(test_df[-2:], self.forecast_variables), scalers_dict, "future"
+            )
+            invalid_dfs = []
+            print("invalidsssss")
+            print(area_df_invalid)
+            print(area_df_invalid[-31:-1])
+            print(area_df_invalid[-30:])
+            invalid_dfs.append(area_df_invalid[-31:-1])
+            invalid_dfs.append(area_df_invalid[-30:])
+            invalid_X, invalid_Y = self.get_scaled_X_Y(
+                slim(invalid_dfs, self.forecast_variables), scalers_dict, "future"
+            )
+            print("X")
+            print(future_X)
+            print("Y")
+            print(future_Y)
+            (
+                forecast_future,
+                dates_future,
+                unscaled_forecast_future,
+                regression_future,
+            ) = self.get_forecasts(
+                test_df[-2:], future_X, future_Y, scalers_dict, forecast_model, "future"
+            )
+            (
+                forecast_invalid,
+                dates_invalid,
+                unscaled_forecast_invalid,
+                regression_future_invalid,
+            ) = self.get_forecasts(
+                invalid_dfs, invalid_X, invalid_Y, scalers_dict, forecast_model, "future"
+            )
+            print("invalid dates")
+            print(dates_invalid)
+            print("forecast future")
+            print(forecast_future)
+            print(dates_future)
             plt.figure(figsize=(18, 12))
             log.info("getting fips")
             fips = train_df[0]["fips"][0]  # here
@@ -707,6 +748,22 @@ class ForecastRt:
             train_unscaled_average_errors.append(train_unscaled_average_error)
 
             if self.predict_days == 1:
+                plt.plot(
+                    np.squeeze(dates_invalid),
+                    np.squeeze(forecast_invalid),
+                    color="magenta",
+                    label="future",
+                    markersize=5,
+                    marker="*",
+                )
+                plt.plot(
+                    np.squeeze(dates_future),
+                    np.squeeze(forecast_future),
+                    color="magenta",
+                    label="future",
+                    markersize=5,
+                    marker="*",
+                )
                 plt.plot(
                     np.squeeze(dates_train),
                     np.squeeze(forecasts_train),
@@ -815,8 +872,8 @@ class ForecastRt:
                 linewidth=DATA_LINEWIDTH,
             )
             plt.plot(
-                area_df.index,
-                area_df["smooth_new_cases"],
+                area_df_invalid.index,
+                area_df_invalid["smooth_new_cases"],
                 label="smooth new cases",
                 markersize=3,
                 marker=".",
@@ -906,7 +963,7 @@ class ForecastRt:
         # test_linear_mae[]
         return
 
-    def get_forecasts(self, df_list, X_list, Y_list, scalers_dict, model):
+    def get_forecasts(self, df_list, X_list, Y_list, scalers_dict, model, label="none"):
         unscaled_predictions = list()
         forecasts = list()
         dates = list()
@@ -947,24 +1004,11 @@ class ForecastRt:
             )
             forecasts.append(thisforecast)
             unscaled_predictions.append(unscaled_prediction)
-            # plt.plot(train_X, train_Y, label = 'data', marker = "*")
-            # plt.plot(train_X, regr.predict(train_X), label = 'fit')
-            # plt.plot(train_prediction_day, train_prediction, label = 'future prediction', marker = "*", markersize = 5)
-            # plt.plot(train_prediction_day, thisforecast, label = 'forecast prediction', marker = "*", markersize = 5)
-            # plt.plot(df.iloc[-self.predict_days :].index, thisforecast, label = "forecast", marker = "*", markersize = 5)
-            # print(f'train_prediction_day: {train_prediction_day} prediction: {train_prediction} forecast: {thisforecast}')
-            # print(f'date: {df.iloc[-self.predict_days :].index}')
+            if label == "none":
+                dates.append(df.iloc[-self.predict_days :].index)
+            elif label == "future":
+                dates.append(df.iloc[-1:].index + timedelta(days=1))
 
-            # plt.legend()
-            # plt.savefig('prediction.pdf')
-            # exit()
-
-            dates.append(df.iloc[-self.predict_days :].index)
-
-        # plt.plot(dates, np.array(regr_prediction).reshape(-1,1), label = "prediction", marker = "*")
-        # plt.plot(dates, np.array(actuals), label = "data", marker = "*")
-        # plt.legend()
-        # plt.savefig('reg_fit.pdf')
         return forecasts, dates, unscaled_predictions, np.array(regr_prediction)
 
     def get_scaling_dictionary(self, train_scaling_set):
@@ -1089,30 +1133,32 @@ class ForecastRt:
         X_train_list = list()
         Y_train_list = list()
         df_list = list()
+
         for i in range(len(sample_list)):
             df = sample_list[i]
+            # if label == 'future':
             df_list.append(df)
             df = df.filter(regex="scaled")
 
-            X = df.iloc[
-                : -self.predict_days, :
-            ]  # exclude last n entries of df to use for prediction
+            if label != "future":
+                X = df.iloc[
+                    : -self.predict_days, :
+                ]  # exclude last n entries of df to use for prediction
+                Y = df.iloc[-self.predict_days :, :]
+                labels = np.array(Y[PREDICT_VAR])
+            else:
+                X = df  # exclude last n entries of df to use for prediction
+                Y = 0
+                labels = 0
+
             if not self.predict_var_input_feature:
                 X = X.drop(columns=PREDICT_VAR)
-            Y = df.iloc[-self.predict_days :, :]
-
-            # fips = X['fips_int'][0]
-            # if fips==2:
-            #  X.to_csv(self.csv_output_folder + label + '_X_' + str(fips) + '_' +  str(i) + '.csv')
-            #  Y.to_csv(self.csv_output_folder + label + '_Y_' + str(fips) + '_' + str(i) + '.csv')
 
             n_rows_train = X.shape[0]
             n_rows_to_add = self.sequence_length - n_rows_train
             pad_rows = np.empty((n_rows_to_add, X.shape[1]), float)
             pad_rows[:] = self.mask_value
             padded_train = np.concatenate((pad_rows, X))
-
-            labels = np.array(Y[PREDICT_VAR])
 
             X_train_list.append(padded_train)
             Y_train_list.append(labels)
