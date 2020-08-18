@@ -66,7 +66,7 @@ class ForecastRt:
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
         self.ref_date = datetime(year=2020, month=1, day=1)
-        self.debug_plots = False
+        self.debug_plots = True
 
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
@@ -168,8 +168,8 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1
-        self.n_hidden_layer_dimensions = 1
+        self.n_epochs = 1000
+        self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
         self.validation_split = 0  # currently using test set as validation set
