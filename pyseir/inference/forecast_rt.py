@@ -1029,6 +1029,7 @@ class ForecastRt:
         plt.legend()
         plt.xlabel(self.predict_variable)
         plt.ylabel("MAPE")
+        plt.ylim(0, 100)
         output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
         plt.savefig(output_path + "_mape_totals.pdf")
 
