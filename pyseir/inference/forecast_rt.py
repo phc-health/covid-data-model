@@ -172,7 +172,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1000
+        self.n_epochs = 1
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -303,7 +303,7 @@ class ForecastRt:
 
     def get_train_test_samples(self, df_forecast):
         # True if test samples are constrained to be latest samples
-        test_set_end_of_sample = True
+        test_set_end_of_sample = False
 
         # create list of dataframe samples
         df_samples = self.create_samples(df_forecast)
@@ -791,14 +791,14 @@ class ForecastRt:
                     markersize=5,
                     marker="*",
                 )
-                plt.plot(
+                plt.scatter(
                     np.squeeze(dates_train),
                     np.squeeze(regression_predictions_train),
                     color="purple",
                     label="linear train",
                     marker="*",
                 )
-                plt.plot(
+                plt.scatter(
                     np.squeeze(dates_test),
                     np.squeeze(regression_predictions_test),
                     color="blue",
@@ -986,52 +986,44 @@ class ForecastRt:
 
         # print(train_mae_array)
         # print(len(train_mae_array))
-        print("actuals")
-        print(actuals_train)
-        print(np.concatenate(actuals_train))
-        print(np.squeeze(np.concatenate(train_mae_array, axis=0)))
-        plt.close("all")
-        plt.scatter(
-            np.concatenate(actuals_train),
-            np.squeeze(np.concatenate(train_mae_array, axis=0)),
-            label="MAE train",
-            s=2,
-            marker="*",
+        plot_percentile_error(
+            actuals_train,
+            actuals_test,
+            train_mae_array,
+            test_mae_array,
+            "mae",
+            self.predict_variable,
         )
-        plt.scatter(
-            np.concatenate(actuals_test),
-            np.squeeze(np.concatenate(test_mae_array, axis=0)),
-            label="MAE test",
-            s=2,
-            marker="*",
+        plot_percentile_error(
+            actuals_train,
+            actuals_test,
+            train_mae_array,
+            test_mae_array,
+            "mape",
+            self.predict_variable,
         )
-        plt.legend()
-        plt.xlabel(self.predict_variable)
-        plt.ylabel("MAE")
-        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-        plt.savefig(output_path + "_mae_totals.pdf")
 
-        plt.close("all")
-        plt.scatter(
-            np.concatenate(actuals_train),
-            np.squeeze(np.concatenate(train_mape_array, axis=0)),
-            label="MAPE train",
-            s=2,
-            marker="*",
-        )
-        plt.scatter(
-            np.concatenate(actuals_test),
-            np.squeeze(np.concatenate(test_mape_array, axis=0)),
-            label="MAPE test",
-            s=2,
-            marker="*",
-        )
-        plt.legend()
-        plt.xlabel(self.predict_variable)
-        plt.ylabel("MAPE")
-        plt.ylim(0, 100)
-        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-        plt.savefig(output_path + "_mape_totals.pdf")
+        # plt.close("all")
+        # plt.scatter(
+        #    np.concatenate(actuals_train),
+        #    np.squeeze(np.concatenate(train_mape_array, axis=0)),
+        #    label="MAPE train",
+        #    s=2,
+        #    marker="*",
+        # )
+        # plt.scatter(
+        #    np.concatenate(actuals_test),
+        #    np.squeeze(np.concatenate(test_mape_array, axis=0)),
+        #    label="MAPE test",
+        #    s=2,
+        #    marker="*",
+        # )
+        # plt.legend()
+        # plt.xlabel(self.predict_variable)
+        # plt.ylabel("MAPE")
+        # plt.ylim(0, 100)
+        # output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+        # plt.savefig(output_path + "_mape_totals.pdf")
 
         # plt.close('all')
         # plt.plot(np.concatenate(actuals_train), np.concatenate(train_mape_array), label = 'MAPE train', marker = '*', markersize = 5)
@@ -1412,6 +1404,45 @@ def align_time_series(series_a, series_b):
         return valid_shifts[np.argmax(xcor)]
     else:
         return 0
+
+
+def plot_percentile_error(actuals_train, actuals_test, train_array, test_array, label, predict_var):
+    actuals_train = np.concatenate(actuals_train)
+    train_array = np.squeeze(np.concatenate(train_array, axis=0))
+    actuals_test = np.concatenate(actuals_test)
+    test_array = np.squeeze(np.concatenate(test_array, axis=0))
+    plt.close("all")
+    plt.scatter(
+        actuals_train, train_array, label="Train", s=2, marker="*",
+    )
+    plt.scatter(
+        actuals_test, test_array, label="Test", s=2, marker="*",
+    )
+    plt.legend()
+    plt.xlabel(predict_var)
+    plt.ylabel(label)
+    output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+    plt.savefig(output_path + "_" + label + "_scatter.pdf")
+
+    plt.close("all")
+    print(actuals_test)
+    print(test_array)
+    df = pd.DataFrame({"value": actuals_test, "metric": test_array})
+    print(df)
+    df.to_csv("df.csv")
+    print(df.metric)
+    cut = pd.cut(
+        df.metric,
+        [0, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300, 500, 1000, 2000, 4000, 6000, 10000],
+    )
+    boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
+    ax = sns.boxplot(data=boxdf)
+    plt.xticks(rotation=30, fontsize=10)
+    plt.ylim(0, 100)
+    fig = ax.get_figure()
+    output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+    plt.savefig(output_path + "_" + label + "_percentile.pdf")
+    return
 
 
 def external_run_forecast():
