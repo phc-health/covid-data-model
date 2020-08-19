@@ -121,28 +121,28 @@ class ForecastRt:
         self.forecast_variables = [
             self.predict_variable,
             f"smooth_{self.daily_case_var}",
-            "Rt_MAP__new_cases",
+            # "Rt_MAP__new_cases",
             f"smooth_{self.daily_death_var}",
-            "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
-            "smooth_median_home_dwell_time_prop",
-            "smooth_full_time_work_prop",
-            "smooth_part_time_work_prop",
-            "smooth_completely_home_prop",
-            "d_smooth_median_home_dwell_time_prop",
-            "d_smooth_full_time_work_prop",
-            "d_smooth_part_time_work_prop",
-            "d_smooth_completely_home_prop",
-            self.fips_var_name_int,
-            "smooth_contact_tracers_count",  # number of contacts traced
-            "smoothed_cli",  # estimated percentage of covid doctor visits
-            "smoothed_hh_cmnty_cli",
-            "smoothed_nohh_cmnty_cli",
-            "smoothed_ili",
-            "smoothed_wcli",
-            "smoothed_wili",
-            "smoothed_search",  # smoothed google health trends da
-            "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
-            "nmf_day_doc_fbs_ght",
+            # "smooth_new_negative_tests",  # calculated by diffing input 'negative_tests' column
+            # "smooth_median_home_dwell_time_prop",
+            # "smooth_full_time_work_prop",
+            # "smooth_part_time_work_prop",
+            # "smooth_completely_home_prop",
+            # "d_smooth_median_home_dwell_time_prop",
+            # "d_smooth_full_time_work_prop",
+            # "d_smooth_part_time_work_prop",
+            # "d_smooth_completely_home_prop",
+            # self.fips_var_name_int,
+            # "smooth_contact_tracers_count",  # number of contacts traced
+            # "smoothed_cli",  # estimated percentage of covid doctor visits
+            # "smoothed_hh_cmnty_cli",
+            # "smoothed_nohh_cmnty_cli",
+            # "smoothed_ili",
+            # "smoothed_wcli",
+            # "smoothed_wili",
+            # "smoothed_search",  # smoothed google health trends da
+            # "nmf_day_doc_fbc_fbs_ght",  # delphi combined indicator
+            # "nmf_day_doc_fbs_ght",
             # Not using variables below
             # "smooth_raw_cli",  # fb raw covid like illness
             # "smooth_raw_ili",  # fb raw flu like illness
