@@ -1321,10 +1321,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     print(df)
     df.to_csv("df.csv")
     print(df.metric)
-    cut = pd.cut(
-        df.metric,
-        [0, 10, 20, 30, 40, 50, 100, 150, 200, 250, 300, 500, 1000, 2000, 4000, 6000, 10000],
-    )
+    cut = pd.cut(df.metric, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     ax = sns.boxplot(data=boxdf)
     plt.xticks(rotation=30, fontsize=10)
