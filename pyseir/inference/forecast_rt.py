@@ -128,10 +128,10 @@ class ForecastRt:
             "smooth_full_time_work_prop",
             "smooth_part_time_work_prop",
             "smooth_completely_home_prop",
-            # "d_smooth_median_home_dwell_time_prop",
-            # "d_smooth_full_time_work_prop",
-            # "d_smooth_part_time_work_prop",
-            # "d_smooth_completely_home_prop",
+            "d_smooth_median_home_dwell_time_prop",
+            "d_smooth_full_time_work_prop",
+            "d_smooth_part_time_work_prop",
+            "d_smooth_completely_home_prop",
             self.fips_var_name_int,
             "smooth_contact_tracers_count",  # number of contacts traced
             "smoothed_cli",  # estimated percentage of covid doctor visits
@@ -169,7 +169,7 @@ class ForecastRt:
         self.sample_train_length = 30  # Set to -1 to use all historical data
         self.predict_days = 1
         self.percent_train = False
-        self.train_size = 0.8
+        self.train_size = 0.6
         self.n_test_days = 10
         self.n_batch = 50
         self.n_epochs = 1000
@@ -208,10 +208,10 @@ class ForecastRt:
         # process dataframe
         state_names, df_forecast_list, df_list, df_invalid_list = [], [], [], []
         for state in state_df_dictionary:
-
             df = state_df_dictionary[state]
             state_name = df[self.fips_var_name][0]
-
+            if self.quick_test and int(state_name) > 3:  # only test two states if quick_test
+                continue
             if self.deaths_cumulative:
                 df[self.daily_case_var] = df[self.case_var].diff()
             if self.cases_cumulative:
@@ -235,9 +235,10 @@ class ForecastRt:
             last_valid_index = df[self.predict_variable].last_valid_index()
             df_invalid = df[:-1].copy()  # because last entry is from raw data is NaN TBD
             if self.quick_test:
+                self.n_batch = 1
                 df = df[first_valid_index:].copy()
                 df = df[:45].copy()
-                self.n_batch = 1
+
             df = df[first_valid_index:last_valid_index].copy()
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
@@ -460,6 +461,7 @@ class ForecastRt:
         Returns
         dates and forecast r_t values
         """
+
         # split merged dataframe into state level dataframes (this includes adding variables and masking nan values)
         area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs()
 
@@ -504,8 +506,8 @@ class ForecastRt:
         skip_train = 29
         skip_test = 10
         if self.quick_test:
-            skip_train = len(final_list_train_X) - 2
-            skip_test = len(final_list_test_X) - 2
+            skip_train = 0
+            skip_test = 0
         if skip_train > 0:
             final_list_train_X = final_list_train_X[:-skip_train]
             final_list_train_Y = final_list_train_Y[:-skip_train]
@@ -559,83 +561,6 @@ class ForecastRt:
         )
         model.evaluate(final_list_train_X, final_list_train_Y)  # this gives actual loss
 
-        (
-            train_scaled_average_error,
-            train_unscaled_total_error,
-            train_unscaled_average_error,
-            train_mape_average,
-        ) = get_aggregate_errors(
-            final_list_train_X,
-            final_list_train_Y,
-            model,
-            scalers_dict,
-            self.predict_variable,
-            self.predict_days,
-        )
-
-        (
-            test_scaled_average_error,
-            test_unscaled_total_error,
-            test_unscaled_average_error,
-            test_mape_average,
-        ) = get_aggregate_errors(
-            final_list_test_X,
-            final_list_test_Y,
-            model,
-            scalers_dict,
-            self.predict_variable,
-            self.predict_days,
-        )
-
-        plt.close("all")
-        fig, ax = plt.subplots()
-        ax.plot(history.history["loss"], color="blue", linestyle="solid", label="Loss Train Set")
-        ax.plot(
-            history.history["val_loss"], color="green", linestyle="solid", label="Loss Test Set",
-        )
-
-        plt.legend()
-        plt.title("Loss vs. Epochs")
-
-        textstr = "\n".join(
-            (
-                "MAE",
-                "TRAIN",
-                f"Scaled Avg:{train_scaled_average_error:.3f}",
-                f"Unscaled Avg:{train_unscaled_average_error:.1f}",
-                f"Unscaled Total:{train_unscaled_total_error:.1f}",
-                "TEST",
-                f"Scaled Avg:{test_scaled_average_error:.3f}",
-                f"Unscaled Avg:{test_unscaled_average_error:.1f}",
-                f"Unscaled Total:{test_unscaled_total_error:.1f}",
-            )
-        )
-        props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
-        ax.text(
-            0.05,
-            0.95,
-            textstr,
-            transform=ax.transAxes,
-            fontsize=8,
-            verticalalignment="top",
-            bbox=props,
-        )
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_LOSS)
-        plt.savefig(output_path, bbox_inches="tight")
-        plt.close("all")
-
-        ax.plot(history.history["mape"], color="blue", linestyle="solid", label="MAPE Train Set")
-        ax.plot(
-            history.history["val_mape"], color="green", linestyle="solid", label="MAPE Test Set",
-        )
-        plt.legend()
-        plt.title("MAPE vs. Epochs")
-        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_LOSS_MAPE)
-        plt.savefig(output_path, bbox_inches="tight")
-        plt.close("all")
-
         forecast_model_skeleton = MyHyperModel(
             train_sequence_length=self.sequence_length,
             predict_sequence_length=self.predict_days,
@@ -653,28 +578,28 @@ class ForecastRt:
         trained_model_weights = model.get_weights()
         forecast_model.set_weights(trained_model_weights)
 
-        DATA_LINEWIDTH = 3
-        MODEL_LINEWIDTH = 0
-        # plot training predictions
-        train_unscaled_average_errors = []
-        train_scaled_average_errors = []
-
-        train_mape = []
-        train_mae = []
-        test_mape = []
-        test_mae = []
+        # Arrays for storing prediction metrics
+        actuals_train = []
+        actuals_test = []
 
         train_linear_mape = []
         train_linear_mae = []
+        train_linear_smape = []
         test_linear_mape = []
         test_linear_mae = []
+        test_linear_smape = []
 
-        train_mape_array = []
-        train_mae_array = []
-        test_mape_array = []
-        test_mae_array = []
-        actuals_train = []
-        actuals_test = []
+        train_forecast_mae = []
+        train_forecast_mape = []
+        train_forecast_smape = []
+        test_forecast_mae = []
+        test_forecast_mape = []
+        test_forecast_smape = []
+
+        # Plot Model Predictions
+        DATA_LINEWIDTH = 3
+        MODEL_LINEWIDTH = 0
+
         for train_df, train_X, train_Y, test_df, test_X, test_Y, area_df, area_df_invalid in zip(
             area_train_samples,
             list_train_X,
@@ -685,23 +610,12 @@ class ForecastRt:
             area_df_list,
             area_df_invalid_list,
         ):
-
-            future_X, future_Y = self.get_scaled_X_Y(
-                slim(test_df[-2:], self.forecast_variables), scalers_dict, "future"
-            )
+            # Test samples not in train/test sets due to incomplete datastreams/no labels
             invalid_dfs = []
             invalid_dfs.append(area_df_invalid[-31:-1])
             invalid_dfs.append(area_df_invalid[-30:])
             invalid_X, invalid_Y = self.get_scaled_X_Y(
                 slim(invalid_dfs, self.forecast_variables), scalers_dict, "future"
-            )
-            (
-                forecast_future,
-                dates_future,
-                unscaled_forecast_future,
-                regression_future,
-            ) = self.get_forecasts(
-                test_df[-2:], future_X, future_Y, scalers_dict, forecast_model, "future"
             )
             (
                 forecast_invalid,
@@ -711,19 +625,8 @@ class ForecastRt:
             ) = self.get_forecasts(
                 invalid_dfs, invalid_X, invalid_Y, scalers_dict, forecast_model, "future"
             )
-            if self.debug_output:
-                print("invalid dates")
-                print(dates_invalid)
-                print("invalid forecasts")
-                print(forecast_invalid)
-                print("forecast future")
-                print(forecast_future)
-                print(dates_future)
 
-            plt.figure(figsize=(18, 12))
-            fips = train_df[0]["fips"][0]  # here
-            state_name = us.states.lookup(fips).name
-            # get linear prediction
+            # Retrieve linear prediction
             (
                 forecasts_train,
                 dates_train,
@@ -736,34 +639,10 @@ class ForecastRt:
                 unscaled_forecasts_test,
                 regression_predictions_test,
             ) = self.get_forecasts(test_df, test_X, test_Y, scalers_dict, forecast_model)
-            (
-                train_scaled_average_error,
-                train_unscaled_total_error,
-                train_unscaled_average_error,
-                train_mape_average,
-            ) = get_aggregate_errors(
-                train_X,
-                train_Y,
-                forecast_model,
-                scalers_dict,
-                self.predict_variable,
-                self.predict_days,
-            )
-            (
-                test_scaled_average_error,
-                test_unscaled_total_error,
-                test_unscaled_average_error,
-                test_mape_average,
-            ) = get_aggregate_errors(
-                test_X,
-                test_Y,
-                forecast_model,
-                scalers_dict,
-                self.predict_variable,
-                self.predict_days,
-            )
-            train_scaled_average_errors.append(train_scaled_average_error)
-            train_unscaled_average_errors.append(train_unscaled_average_error)
+
+            plt.figure(figsize=(18, 12))
+            fips = train_df[0]["fips"][0]
+            state_name = us.states.lookup(fips).name
 
             if self.predict_days == 1:
                 plt.plot(
@@ -775,18 +654,19 @@ class ForecastRt:
                     marker="*",
                 )
                 plt.plot(
-                    np.squeeze(dates_future),
-                    np.squeeze(forecast_future),
-                    color="magenta",
-                    label="future",
+                    np.squeeze(dates_train),
+                    np.squeeze(forecasts_train),
+                    color="green",
+                    label="Train",
+                    linewidth=MODEL_LINEWIDTH,
                     markersize=5,
                     marker="*",
                 )
                 plt.plot(
-                    np.squeeze(dates_train),
-                    np.squeeze(forecasts_train),
-                    color="green",
-                    label="Train Set",
+                    np.squeeze(dates_test),
+                    np.squeeze(forecasts_test),
+                    color="orange",
+                    label="Test",
                     linewidth=MODEL_LINEWIDTH,
                     markersize=5,
                     marker="*",
@@ -795,67 +675,58 @@ class ForecastRt:
                     np.squeeze(dates_train),
                     np.squeeze(regression_predictions_train),
                     color="purple",
-                    label="linear train",
-                    marker="*",
+                    label="Train Linear",
+                    marker="o",
                 )
                 plt.scatter(
                     np.squeeze(dates_test),
                     np.squeeze(regression_predictions_test),
                     color="blue",
-                    label="linear test",
-                    marker="*",
+                    label="Test Linear",
+                    marker="o",
                 )
-                plt.plot(
-                    np.squeeze(dates_test),
-                    np.squeeze(forecasts_test),
-                    color="orange",
-                    label="Test Set",
-                    linewidth=MODEL_LINEWIDTH,
-                    markersize=5,
-                    marker="*",
-                )
-                train_actuals = scalers_dict[self.predict_variable].inverse_transform(
+
+                # Retrieve actual data points for preformance metric calculations
+                train_labels = scalers_dict[self.predict_variable].inverse_transform(
                     train_Y.reshape(1, -1)
                 )
-                test_actuals = scalers_dict[self.predict_variable].inverse_transform(
+                test_labels = scalers_dict[self.predict_variable].inverse_transform(
                     test_Y.reshape(1, -1)
                 )
-                mae_train = np.mean(
-                    tf.keras.losses.MAE(train_actuals, regression_predictions_train)
+
+                # linear regression preformance metrics
+                mae_train_linear, mape_train_linear, smape_train_linear = get_error_metrics(
+                    train_labels, regression_predictions_train
                 )
-                mape_train = np.mean(
-                    tf.keras.losses.MAPE(train_actuals, regression_predictions_train)
+                mae_test_linear, mape_test_linear, smape_test_linear = get_error_metrics(
+                    test_labels, regression_predictions_test
                 )
-                mae_test = np.mean(tf.keras.losses.MAE(test_actuals, regression_predictions_test))
-                mape_test = np.mean(tf.keras.losses.MAPE(test_actuals, regression_predictions_test))
 
-                mae_train_forecast = tf.keras.losses.MAE(train_actuals, forecasts_train)
-                mae_train_forecast_mean = np.mean(mae_train_forecast)
-                mape_train_forecast = tf.keras.losses.MAPE(train_actuals, forecasts_train)
-                mape_train_forecast_mean = np.mean(mape_train_forecast)
+                # forecast preformance metrics
+                mae_train_forecast, mape_train_forecast, smape_train_forecast = get_error_metrics(
+                    train_labels, forecasts_train
+                )
+                mae_test_forecast, mape_test_forecast, smape_test_forecast = get_error_metrics(
+                    test_labels, forecasts_test
+                )
 
-                mae_test_forecast = tf.keras.losses.MAE(test_actuals, forecasts_test)
-                mae_test_forecast_mean = np.mean(mae_test_forecast)
-                mape_test_forecast = tf.keras.losses.MAPE(test_actuals, forecasts_test)
-                mape_test_forecast_mean = np.mean(mape_test_forecast)
-
-                train_mae_array.append(mae_train_forecast)
-                train_mape_array.append(mape_train_forecast)
-                test_mae_array.append(mae_test_forecast)
-                test_mape_array.append(mape_test_forecast)
-
-                train_mape.append(mape_train_forecast_mean)
-                train_mae.append(mae_train_forecast_mean)
-                test_mape.append(mape_test_forecast_mean)
-                test_mae.append(mae_test_forecast_mean)
-
-                train_linear_mape.append(mape_train)
-                train_linear_mae.append(mae_train)
-                test_linear_mape.append(mape_test)
-                test_linear_mae.append(mae_test)
-
-                actuals_train.append(np.squeeze(train_actuals))
-                actuals_test.append(np.squeeze(test_actuals))
+                # Append metrics to arrays for meta metrics analysis
+                actuals_train.extend(np.squeeze(train_labels))
+                actuals_test.extend(np.squeeze(test_labels))
+                # Linear Predictions
+                train_linear_mae.extend(mae_train_linear)
+                train_linear_mape.extend(mape_train_linear)
+                train_linear_smape.extend(smape_train_linear)
+                test_linear_mae.extend(mae_test_linear)
+                test_linear_mape.extend(mape_test_linear)
+                test_linear_smape.extend(smape_test_linear)
+                # Forecast Predictions
+                train_forecast_mae.extend(mae_train_forecast)
+                train_forecast_mape.extend(mape_train_forecast)
+                train_forecast_smape.extend(smape_train_forecast)
+                test_forecast_mae.extend(mae_test_forecast)
+                test_forecast_mape.extend(mape_test_forecast)
+                test_forecast_smape.extend(smape_test_forecast)
 
             else:
                 for n in range(len(dates_train)):
@@ -897,7 +768,7 @@ class ForecastRt:
             plt.plot(
                 area_df.index,
                 area_df[self.predict_variable],
-                label="Data",
+                label=self.predict_variable,
                 markersize=3,
                 marker=".",
                 linewidth=DATA_LINEWIDTH,
@@ -928,16 +799,18 @@ class ForecastRt:
                 "patience": self.patience,
                 "validation split": self.validation_split,
                 "mask value": self.mask_value,
-                "train total MAE": train_unscaled_total_error,
-                "test total MAE": test_unscaled_total_error,
-                "train MAE": mae_train_forecast_mean,
-                "train linear MAE": mae_train,
-                "train MAPE": mape_train_forecast_mean,
-                "train linear MAPE": mape_train,
-                "test MAE": mae_test_forecast_mean,
-                "test linear MAE": mae_test,
-                "test MAPE": mape_test_forecast_mean,
-                "test linear MAPE": mape_test,
+                "MAE: train forecast": np.mean(mae_train_forecast),
+                "MAE: train linear": np.mean(mae_train_linear),
+                "MAPE: train forecast": np.mean(mape_train_forecast),
+                "MAPE: train linear": np.mean(mape_train_linear),
+                "SMAPE: train forecast": np.mean(smape_train_forecast),
+                "SMAPE: trian linear": np.mean(smape_train_linear),
+                "MAE: test forecast": np.mean(mae_test_forecast),
+                "MAE: test linear": np.mean(mae_test_linear),
+                "MAPE: test forecast": np.mean(mae_test_forecast),
+                "MAPE: test linear": np.mean(mae_test_linear),
+                "SMAPE: test forecast": np.mean(smape_test_forecast),
+                "SMAPE: test linear": np.mean(smape_test_linear),
             }
             for i, (k, v) in enumerate(seq_params_dict.items()):
 
@@ -970,66 +843,83 @@ class ForecastRt:
             state_obj = us.states.lookup(state_name)
             plt.savefig(output_path, bbox_inches="tight")
             plt.close("all")
-        log.info("unscaled")
-        log.info(np.mean(train_unscaled_average_errors))
-        log.info("scaled")
-        log.info(np.mean(train_scaled_average_errors))
 
-        log.info(f"forecast train mape: {np.mean(train_mape)}")
-        log.info(f"forecast train mae: {np.mean(train_mae)}")
-        log.info(f"forecast test mape: {np.mean(test_mape)}")
-        log.info(f"forecast test mae: {np.mean(test_mae)}")
-        log.info(f"linear train mape: {np.mean(train_linear_mape)}")
-        log.info(f"linear train mae: {np.mean(train_linear_mae)}")
-        log.info(f"linear test mape: {np.mean(test_linear_mape)}")
-        log.info(f"linaer test mae: {np.mean(test_linear_mae)}")
+        # log.info(f"forecast train mape: {np.mean(train_mape)}")
+        # log.info(f"forecast train mae: {np.mean(train_mae)}")
+        # log.info(f"forecast test mape: {np.mean(test_mape)}")
+        # log.info(f"forecast test mae: {np.mean(test_mae)}")
+        # log.info(f"linear train mape: {np.mean(train_linear_mape)}")
+        # log.info(f"linear train mae: {np.mean(train_linear_mae)}")
+        # log.info(f"linear test mape: {np.mean(test_linear_mape)}")
+        # log.info(f"linaer test mae: {np.mean(test_linear_mae)}")
 
-        # print(train_mae_array)
-        # print(len(train_mae_array))
+        # Plot loss Plot with Combined Preformance Metrics
+        plt.close("all")
+        fig, ax = plt.subplots()
+        ax.plot(history.history["loss"], color="blue", linestyle="solid", label="Train")
+        ax.plot(
+            history.history["val_loss"], color="green", linestyle="solid", label="Test",
+        )
+
+        plt.legend(loc="upper right")
+        plt.title("Loss vs. Epochs")
+
+        textstr = "\n".join(
+            (
+                "TRAIN (forecast, linear)",
+                f"MAE: ({np.mean(train_forecast_mae):.1f}, {np.mean(train_linear_mae):.1f})",
+                f"MAPE: ({np.mean(train_forecast_mape):.1f}, {np.mean(train_linear_mape):.1f})",
+                f"SMAPE: ({np.mean(train_forecast_smape):.1f}, {np.mean(train_linear_smape):.1f})",
+                "",
+                "TEST (forecast, linear)",
+                f"MAE: ({np.mean(test_forecast_mae):.1f}, {np.mean(test_linear_mae):.1f})",
+                f"MAPE: ({np.mean(test_forecast_mape):.1f}, {np.mean(test_linear_mape):.1f})",
+                f"SMAPE: ({np.mean(test_forecast_smape):.1f}, {np.mean(test_linear_smape):.1f})",
+            )
+        )
+        props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
+        ax.text(
+            0.05,
+            0.95,
+            textstr,
+            transform=ax.transAxes,
+            fontsize=8,
+            verticalalignment="top",
+            bbox=props,
+        )
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        output_path = get_run_artifact_path("01", RunArtifact.FORECAST_LOSS)
+        plt.savefig(output_path, bbox_inches="tight")
+        plt.close("all")
+
+        print("starting percentile plots MAE")
         plot_percentile_error(
             actuals_train,
             actuals_test,
-            train_mae_array,
-            test_mae_array,
+            train_forecast_mae,
+            test_forecast_mae,
             "mae",
             self.predict_variable,
         )
+        print("MAPE")
         plot_percentile_error(
             actuals_train,
             actuals_test,
-            train_mae_array,
-            test_mae_array,
+            train_forecast_mape,
+            test_forecast_mape,
             "mape",
             self.predict_variable,
         )
 
-        # plt.close("all")
-        # plt.scatter(
-        #    np.concatenate(actuals_train),
-        #    np.squeeze(np.concatenate(train_mape_array, axis=0)),
-        #    label="MAPE train",
-        #    s=2,
-        #    marker="*",
-        # )
-        # plt.scatter(
-        #    np.concatenate(actuals_test),
-        #    np.squeeze(np.concatenate(test_mape_array, axis=0)),
-        #    label="MAPE test",
-        #    s=2,
-        #    marker="*",
-        # )
-        # plt.legend()
-        # plt.xlabel(self.predict_variable)
-        # plt.ylabel("MAPE")
-        # plt.ylim(0, 100)
-        # output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-        # plt.savefig(output_path + "_mape_totals.pdf")
-
-        # plt.close('all')
-        # plt.plot(np.concatenate(actuals_train), np.concatenate(train_mape_array), label = 'MAPE train', marker = '*', markersize = 5)
-        # plt.plot(np.concatenate(actuals_test), np.concatenate(test_mape_array), label = 'MAPE test', marker = '*', markersize = 5)
-        # output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-        # plt.savefig(output_path + "_mape_totals.pdf")
+        plot_percentile_error(
+            actuals_train,
+            actuals_test,
+            train_forecast_smape,
+            test_forecast_smape,
+            "smape",
+            self.predict_variable,
+        )
 
         return
 
@@ -1406,28 +1296,28 @@ def align_time_series(series_a, series_b):
         return 0
 
 
-def plot_percentile_error(actuals_train, actuals_test, train_array, test_array, label, predict_var):
-    actuals_train = np.concatenate(actuals_train)
-    train_array = np.squeeze(np.concatenate(train_array, axis=0))
-    actuals_test = np.concatenate(actuals_test)
-    test_array = np.squeeze(np.concatenate(test_array, axis=0))
+def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
+    print(test_metric)
+    print(test_data)
+    # train_array = np.squeeze(np.concatenate(train_array))
+    # test_array = np.squeeze(np.concatenate(test_array))
+    # actuals_train = np.squeeze(np.concatenate(actuals_train))
+    # actuals_test = np.squeeze(np.concatenate(actuals_test))
     plt.close("all")
     plt.scatter(
-        actuals_train, train_array, label="Train", s=2, marker="*",
+        train_data, train_metric, label="Train", s=2, marker="*",
     )
     plt.scatter(
-        actuals_test, test_array, label="Test", s=2, marker="*",
+        test_data, test_metric, label="Test", s=2, marker="*",
     )
     plt.legend()
     plt.xlabel(predict_var)
     plt.ylabel(label)
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-    plt.savefig(output_path + "_" + label + "_scatter.pdf")
+    plt.savefig(output_path + "_" + label + "_scatter.pdf", bbox_inches="tight")
 
     plt.close("all")
-    print(actuals_test)
-    print(test_array)
-    df = pd.DataFrame({"value": actuals_test, "metric": test_array})
+    df = pd.DataFrame({"value": test_data, "metric": test_metric})
     print(df)
     df.to_csv("df.csv")
     print(df.metric)
@@ -1439,10 +1329,26 @@ def plot_percentile_error(actuals_train, actuals_test, train_array, test_array, 
     ax = sns.boxplot(data=boxdf)
     plt.xticks(rotation=30, fontsize=10)
     plt.ylim(0, 100)
+    plt.xlabel(predict_var)
+    plt.ylabel(label)
     fig = ax.get_figure()
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-    plt.savefig(output_path + "_" + label + "_percentile.pdf")
+    plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
     return
+
+
+def smape_array(actual_array, predicted_array):
+    array = []
+    for i, j in zip(actual_array, predicted_array):
+        array.append(100 * (abs(i - j) / (abs(i) + abs(j)) / 2))
+    return array
+
+
+def get_error_metrics(data, prediction):
+    mae = tf.keras.losses.MAE(data, prediction)
+    mape = tf.keras.losses.MAPE(data, prediction)
+    smape = smape_array(data, prediction)
+    return np.squeeze(mae), np.squeeze(mape), np.squeeze(smape)
 
 
 def external_run_forecast():
