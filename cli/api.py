@@ -8,6 +8,7 @@ import pydantic
 import api
 from api.can_api_definition import RegionSummaryWithTimeseries
 from api.can_api_definition import AggregateRegionSummaryWithTimeseries
+from libs import us_state_abbrev
 from libs import update_readme_schemas
 from libs.pipelines import api_pipeline
 from libs.datasets import combined_datasets
@@ -89,8 +90,7 @@ def update_schemas(output_dir, update_readme):
 def generate_api(input_dir, output, summary_output, aggregation_level, state, fips):
     """The entry function for invocation"""
 
-    active_states = [state.abbr for state in us.STATES]
-    active_states = active_states + ["PR"]
+    active_states = us_state_abbrev.SUPPORTED_STATES
     us_latest = combined_datasets.load_us_latest_dataset().get_subset(
         aggregation_level, state=state, fips=fips, states=active_states
     )

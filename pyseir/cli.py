@@ -16,7 +16,7 @@ from pyseir.ensembles import ensemble_runner
 from pyseir.inference import model_fitter
 from pyseir.deployment.webui_data_adaptor_v1 import WebUIDataAdaptorV1
 from libs.datasets import combined_datasets
-from libs.us_state_abbrev import ABBREV_US_STATE
+from libs import us_state_abbrev
 from pyseir.inference.whitelist_generator import WhitelistGenerator
 
 
@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."
 root = logging.getLogger()
 
 DEFAULT_RUN_MODE = "can-inference-derived"
-ALL_STATES = [state_obj.abbr for state_obj in us.STATES] + ["PR"]
+
+ALL_STATES = us_state_abbrev.SUPPORTED_STATES
 
 
 def _cache_global_datasets():

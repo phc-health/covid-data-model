@@ -194,3 +194,6 @@ ABBREV_US_UNKNOWN_COUNTY_FIPS = {abbrev: f"{fips}999" for abbrev, fips in ABBREV
 
 # thank you to @kinghelix and @trevormarburger for this idea
 ABBREV_US_STATE = dict(map(reversed, US_STATE_ABBREV.items()))
+
+# All states and territories supported for model and api output.
+SUPPORTED_STATES = [state_obj.abbr for state_obj in us.STATES] + ["PR", "MP"]
