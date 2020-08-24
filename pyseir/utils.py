@@ -47,6 +47,7 @@ class RunArtifact(Enum):
     FORECAST_RESULT = "forecast_result"
     FORECAST_LOSS = "forecast_loss"
     FORECAST_LOSS_MAPE = "forecast_loss_mape"
+    MODEL = "model"
 
     RT_INFERENCE_RESULT = "rt_inference_result"
     RT_INFERENCE_REPORT = "rt_inference_report"
@@ -235,6 +236,10 @@ def get_run_artifact_path(fips, artifact, output_dir=None) -> str:
             "reports",
             f"Forecast_var_unscaled_{state_obj.name}__{fips}.pdf",
         )
+    elif artifact is RunArtifact.MODEL:
+        path = os.path.join(
+            STATE_SUMMARY_FOLDER(output_dir),
+            "reports")
 
     elif artifact is RunArtifact.FORECAST_LOSS:
         path = os.path.join(STATE_SUMMARY_FOLDER(output_dir), "reports", f"Forecast_loss.pdf",)

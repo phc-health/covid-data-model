@@ -68,6 +68,7 @@ class ForecastRt:
         self.df_all = df_all
         self.states = "All"  # All to use All
         self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
+        self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
@@ -175,7 +176,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1000
+        self.n_epochs = 1
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -563,6 +564,9 @@ class ForecastRt:
             shuffle=True,
             validation_data=(final_list_test_X, final_list_test_Y),
         )
+
+        output_path = get_run_artifact_path(fips, RunArtifact.MODEL)
+        model.save(output_path + "/model.h5")
         model.evaluate(final_list_train_X, final_list_train_Y)  # this gives actual loss
 
         forecast_model_skeleton = MyHyperModel(
@@ -1068,6 +1072,7 @@ class ForecastRt:
             # validation_data=(final_test_X[:-4], final_test_Y[:-4]),
             validation_data=(final_test_X, final_test_Y),
         )
+
         # if self.debug_plots:
         if True:
             plt.close("all")
@@ -1334,6 +1339,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
     plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
     df.to_csv(output_path + "_" + label + "_df.csv")
+    log.info("saved csv")
     return
 
 
