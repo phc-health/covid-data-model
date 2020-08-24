@@ -78,7 +78,7 @@ execute_model() {
   # extremely helpful for debugging / QA'ing the model results.
   echo ">>> Generating pyseir.zip from PDFs in output/pyseir."
   pushd output
-  zip -r "${API_OUTPUT_DIR}/pyseir.zip" pyseir/* -i '*.pdf' forecast/*
+  zip -r "${API_OUTPUT_DIR}/pyseir.zip" pyseir/* -i '*' forecast/*
   popd
 }
 
