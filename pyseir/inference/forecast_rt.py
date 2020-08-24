@@ -128,10 +128,10 @@ class ForecastRt:
             "smooth_full_time_work_prop",
             "smooth_part_time_work_prop",
             "smooth_completely_home_prop",
-            # "d_smooth_median_home_dwell_time_prop",
-            # "d_smooth_full_time_work_prop",
-            # "d_smooth_part_time_work_prop",
-            # "d_smooth_completely_home_prop",
+            "d_smooth_median_home_dwell_time_prop",
+            "d_smooth_full_time_work_prop",
+            "d_smooth_part_time_work_prop",
+            "d_smooth_completely_home_prop",
             self.fips_var_name_int,
             "smooth_contact_tracers_count",  # number of contacts traced
             "smoothed_cli",  # estimated percentage of covid doctor visits
@@ -169,7 +169,7 @@ class ForecastRt:
         self.sample_train_length = 30  # Set to -1 to use all historical data
         self.predict_days = 1
         self.percent_train = False
-        self.train_size = 0.6
+        self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
         self.n_epochs = 1000
@@ -1318,9 +1318,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
 
     plt.close("all")
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
-    print(df)
-    df.to_csv("df.csv")
-    print(df.metric)
+
     cut = pd.cut(df.metric, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     ax = sns.boxplot(data=boxdf)
@@ -1331,6 +1329,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     fig = ax.get_figure()
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
     plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
+    df.to_csv(output_path + label + "df.csv")
     return
 
 
