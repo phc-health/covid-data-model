@@ -175,7 +175,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1
+        self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -1333,7 +1333,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     fig = ax.get_figure()
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
     plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
-    df.to_csv(output_path + label + "df.csv")
+    df.to_csv(output_path + "_" + label + "_df.csv")
     return
 
 
