@@ -567,6 +567,8 @@ class ForecastRt:
 
         output_path = get_run_artifact_path(fips, RunArtifact.MODEL)
         model.save(output_path)
+        log.info(output_path)
+        log.info('SAVED model')
         model.evaluate(final_list_train_X, final_list_train_Y)  # this gives actual loss
 
         forecast_model_skeleton = MyHyperModel(
