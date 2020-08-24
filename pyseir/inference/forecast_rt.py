@@ -67,7 +67,7 @@ class ForecastRt:
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
         self.states = "All"  # All to use All
-        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
+        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
         self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas

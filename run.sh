@@ -69,9 +69,7 @@ execute_model() {
   pyseir build-all --output-dir="${API_OUTPUT_DIR}" | tee "${API_OUTPUT_DIR}/stdout.log"
 
   # Move state output to the expected location.
-  echo "making output dir"
   mkdir -p ${API_OUTPUT_DIR}/
-  echo "moving output"
   #mv ${API_OUTPUT_DIR}/web_ui/* ${API_OUTPUT_DIR}/
 
   #rmdir ${API_OUTPUT_DIR}/web_ui/
@@ -80,7 +78,7 @@ execute_model() {
   # extremely helpful for debugging / QA'ing the model results.
   echo ">>> Generating pyseir.zip from PDFs in output/pyseir."
   pushd output
-  zip -r "${API_OUTPUT_DIR}/pyseir.zip" pyseir/* -i '*.pdf'
+  zip -r "${API_OUTPUT_DIR}/pyseir.zip" pyseir/* -i '*.pdf' forecast/*
   popd
 }
 
