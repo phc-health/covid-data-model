@@ -237,9 +237,7 @@ def get_run_artifact_path(fips, artifact, output_dir=None) -> str:
             f"Forecast_var_unscaled_{state_obj.name}__{fips}.pdf",
         )
     elif artifact is RunArtifact.MODEL:
-        path = os.path.join(
-            STATE_SUMMARY_FOLDER(output_dir),
-            "reports")
+        path = os.path.join(STATE_SUMMARY_FOLDER(output_dir), "reports", "model.h5")
 
     elif artifact is RunArtifact.FORECAST_LOSS:
         path = os.path.join(STATE_SUMMARY_FOLDER(output_dir), "reports", f"Forecast_loss.pdf",)
