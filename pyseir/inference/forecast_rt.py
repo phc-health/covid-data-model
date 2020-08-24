@@ -50,6 +50,9 @@ from cycler import cycler
 import seaborn as sns
 from pandas.plotting import scatter_matrix
 
+# Reduce LR
+from keras.callbacks import ReduceLROnPlateau
+
 configure(processors=[merge_threadlocal, structlog.processors.KeyValueRenderer()])
 log = structlog.get_logger(__name__)
 
@@ -79,7 +82,7 @@ class ForecastRt:
         self.fips_var_name_int = (
             "fips_int"  # name of fips used in forecast (cast from input string to int)
         )
-        self.quick_test = False
+        self.quick_test = True
         self.sim_date_name = "sim_day"
         self.index_col_name_csv = "date"
         self.cases_cumulative = True
@@ -172,7 +175,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1000
+        self.n_epochs = 1
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -549,6 +552,7 @@ class ForecastRt:
         )
         es = EarlyStopping(monitor="loss", mode="min", verbose=1, patience=self.patience)
         tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="fit_logs")
+        reduce_lr = ReduceLROnPlateau(monitor="val_loss", factor=0.2, patience=5, min_lr=0.001)
         history = model.fit(
             final_list_train_X,
             final_list_train_Y,
