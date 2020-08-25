@@ -48,6 +48,7 @@ class RunArtifact(Enum):
     FORECAST_LOSS = "forecast_loss"
     FORECAST_LOSS_MAPE = "forecast_loss_mape"
     MODEL = "model"
+    SCALING_DICTIONARY = "scaling_dictionary"
 
     RT_INFERENCE_RESULT = "rt_inference_result"
     RT_INFERENCE_REPORT = "rt_inference_report"
@@ -252,6 +253,8 @@ def get_run_artifact_path(fips, artifact, output_dir=None) -> str:
         path = os.path.join(
             output_dir, "forecast", f"Forecast_result_{state_obj.name}__{fips}.pdf",
         )
+    elif artifact is RunArtifact.SCALING_DICTIONARY:
+        path = os.path.join(output_dir, "forecast", "scaling_dictionary.pkl",)
 
     else:
         raise ValueError(f"No paths available for artifact {RunArtifact}")

@@ -45,6 +45,9 @@ from pandas.core.window.indexers import (
 # Linear Regression
 from sklearn import linear_model
 
+# Save MinMaxScaler Dictionary
+import pickle
+
 # Aesthetics
 from cycler import cycler
 import seaborn as sns
@@ -63,6 +66,12 @@ class ForecastRt:
     """
 
     def __init__(self, df_all=None):
+        self.train = False
+        self.infer_only_n_days = 45
+        self.scaling_dictionary_file = (
+            "../covid-data-public/forecast_data/models/aug5_scaling_dicionary.pkl"
+        )
+        self.model_file = "../covid-data-public/forecast_data/models/test_model.h5"
         self.save_csv_output = False  # do not set to true for github actions run
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
@@ -73,7 +82,7 @@ class ForecastRt:
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
         self.ref_date = datetime(year=2020, month=1, day=1)
-        self.debug_plots = False
+        self.debug_plots = True
         self.debug_output = False
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
@@ -176,7 +185,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1000
+        self.n_epochs = 1
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -187,13 +196,14 @@ class ForecastRt:
     def run_forecast(cls, df_all=None):
         engine = cls(df_all)
         return engine.forecast_rt()
+        # return engine.infer_rt()
 
-    def get_forecast_dfs(self):
+    def get_forecast_dfs(self, csvfile, mode):
         if self.merged_df is None or not self.states_only:
             raise NotImplementedError("Only states are supported.")
 
         df_merge = pd.read_csv(
-            self.csv_path,
+            csvfile,
             parse_dates=True,
             index_col=self.index_col_name_csv,
             converters={self.fips_var_name: str},
@@ -242,6 +252,8 @@ class ForecastRt:
                 self.n_batch = 1
                 df = df[first_valid_index:].copy()
                 df = df[:45].copy()
+            if mode == "infer":
+                df = df[-self.infer_only_n_days :].copy()
 
             df = df[first_valid_index:last_valid_index].copy()
 
@@ -456,6 +468,63 @@ class ForecastRt:
 
         return
 
+    def infer_rt(self):
+        area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs(
+            self.csv_test_path, "infer"
+        )
+        # Load Scaling Dictionary
+        scalers_file = open(self.scaling_dictionary_file, "rb")
+        scalers_dict = pickle.load(scalers_file)
+        # Load Model
+        model = keras.models.load_model(self.model_file, custom_objects={"smape": smape})
+
+        area_test_samples = []
+        for df, fips in zip(area_df_list, area_fips):
+            samples = self.create_samples(df)
+            slimmed_samples = slim(samples, self.forecast_variables)
+            test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "test")
+            (
+                forecasts_test,
+                dates_test,
+                unscaled_forecasts_test,
+                regression_predictions_test,
+            ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
+            plt.figure(figsize=(18, 12))
+            print(df.columns)
+            print(df["fips"])
+            fips = samples[0]["fips"][0]
+            state_name = us.states.lookup(fips).name
+            plt.plot(
+                np.squeeze(dates_test),
+                np.squeeze(forecasts_test),
+                color="orange",
+                label="Test",
+                linewidth=0,
+                markersize=5,
+                marker="*",
+            )
+            plt.scatter(
+                np.squeeze(dates_test),
+                np.squeeze(regression_predictions_test),
+                color="purple",
+                label="Test Linear",
+                marker="o",
+            )
+            plt.plot(
+                df.index,
+                df[self.predict_variable],
+                label=self.predict_variable,
+                markersize=3,
+                marker=".",
+                linewidth=3,
+            )
+            plt.savefig(state_name + ".pdf")
+
+        if self.debug_plots:
+            self.plot_variables(
+                slim(area_df_list, self.forecast_variables), area_fips, scalers_dict
+            )
+
     def forecast_rt(self):
         """
         predict r_t for 14 days into the future
@@ -467,8 +536,9 @@ class ForecastRt:
         """
 
         # split merged dataframe into state level dataframes (this includes adding variables and masking nan values)
-        area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs()
-
+        area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs(
+            self.csv_path, "train"
+        )
         # get train, test, and scaling samples per state and append to list
         area_scaling_samples, area_train_samples, area_test_samples = [], [], []
         for df, fips in zip(area_df_list, area_fips):
@@ -482,6 +552,10 @@ class ForecastRt:
         # TODO add max min rows to avoid domain adaption issues
         train_scaling_set = pd.concat(area_scaling_samples)
         scalers_dict = self.get_scaling_dictionary(slim(train_scaling_set, self.forecast_variables))
+        output_path = get_run_artifact_path(fips, RunArtifact.SCALING_DICTIONARY)
+        f = open(output_path, "wb")
+        pickle.dump(scalers_dict, f)
+        f.close()
 
         if self.debug_plots:
             self.plot_variables(
@@ -524,8 +598,6 @@ class ForecastRt:
             model, history, tuner = self.build_model(
                 final_list_train_X, final_list_train_Y, final_list_test_X, final_list_test_Y,
             )
-
-            # TODO find a better way to do this and change batch size?
             best_hps = tuner.get_best_hyperparameters()[0]
             dropout = best_hps.get("dropout")
             n_hidden_layer_dimensions = best_hps.get("n_hidden_layer_dimensions")
@@ -565,10 +637,6 @@ class ForecastRt:
             validation_data=(final_list_test_X, final_list_test_Y),
         )
 
-        output_path = get_run_artifact_path(fips, RunArtifact.MODEL)
-        model.save(output_path)
-        log.info(output_path)
-        log.info("SAVED model")
         model.evaluate(final_list_train_X, final_list_train_Y)  # this gives actual loss
 
         forecast_model_skeleton = MyHyperModel(
@@ -587,6 +655,9 @@ class ForecastRt:
         )
         trained_model_weights = model.get_weights()
         forecast_model.set_weights(trained_model_weights)
+        # Save trained model that has batch size 1 for future forecasts
+        output_path = get_run_artifact_path(fips, RunArtifact.MODEL)
+        forecast_model.save(output_path)
 
         # Arrays for storing prediction metrics
         actuals_train = []
@@ -853,15 +924,6 @@ class ForecastRt:
             state_obj = us.states.lookup(state_name)
             plt.savefig(output_path, bbox_inches="tight")
             plt.close("all")
-
-        # log.info(f"forecast train mape: {np.mean(train_mape)}")
-        # log.info(f"forecast train mae: {np.mean(train_mae)}")
-        # log.info(f"forecast test mape: {np.mean(test_mape)}")
-        # log.info(f"forecast test mae: {np.mean(test_mae)}")
-        # log.info(f"linear train mape: {np.mean(train_linear_mape)}")
-        # log.info(f"linear train mae: {np.mean(train_linear_mae)}")
-        # log.info(f"linear test mape: {np.mean(test_linear_mape)}")
-        # log.info(f"linaer test mae: {np.mean(test_linear_mae)}")
 
         # Plot loss Plot with Combined Preformance Metrics
         plt.close("all")
@@ -1330,8 +1392,10 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.close("all")
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
 
-    cut = pd.cut(df.metric, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
+    cut = pd.cut(df.value, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
+    counts = df.groupby(cut).agg(["count"])
+    print(counts)
     ax = sns.boxplot(data=boxdf)
     plt.xticks(rotation=30, fontsize=10)
     plt.ylim(0, 100)
@@ -1340,6 +1404,8 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     fig = ax.get_figure()
     output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
     plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
+    ax = sns.swarmplot(data=boxdf, color=".25")
+    plt.savefig(output_path + "_" + label + "_swarm_percentile.pdf", bbox_inches="tight")
     df.to_csv(output_path + "_" + label + "_df.csv")
     log.info("saved csv")
     return
