@@ -82,7 +82,7 @@ class ForecastRt:
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
         self.ref_date = datetime(year=2020, month=1, day=1)
-        self.debug_plots = True
+        self.debug_plots = False
         self.debug_output = False
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
@@ -195,8 +195,8 @@ class ForecastRt:
     @classmethod
     def run_forecast(cls, df_all=None):
         engine = cls(df_all)
-        return engine.forecast_rt()
-        # return engine.infer_rt()
+        # return engine.forecast_rt()
+        return engine.infer_rt()
 
     def get_forecast_dfs(self, csvfile, mode):
         if self.merged_df is None or not self.states_only:
@@ -469,6 +469,7 @@ class ForecastRt:
         return
 
     def infer_rt(self):
+        compute_metrics = True
         area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs(
             self.csv_test_path, "infer"
         )
@@ -478,7 +479,16 @@ class ForecastRt:
         # Load Model
         model = keras.models.load_model(self.model_file, custom_objects={"smape": smape})
 
+        # Arrays for storing prediction metrics
+        actuals_test = []
+        test_linear_mape = []
+        test_linear_mae = []
+        test_linear_smape = []
+        test_forecast_mae = []
+        test_forecast_mape = []
+        test_forecast_smape = []
         area_test_samples = []
+
         for df, fips in zip(area_df_list, area_fips):
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
@@ -490,8 +500,6 @@ class ForecastRt:
                 regression_predictions_test,
             ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
             plt.figure(figsize=(18, 12))
-            print(df.columns)
-            print(df["fips"])
             fips = samples[0]["fips"][0]
             state_name = us.states.lookup(fips).name
             plt.plot(
@@ -518,7 +526,63 @@ class ForecastRt:
                 marker=".",
                 linewidth=3,
             )
-            plt.savefig(state_name + ".pdf")
+            plt.xlabel(self.sim_date_name)
+            plt.ylabel(self.predict_variable)
+            plt.legend()
+            plt.grid(which="both", alpha=0.5)
+            plt.title(state_name)
+
+            # Compute metrics
+            if compute_metrics:
+                test_labels = scalers_dict[self.predict_variable].inverse_transform(
+                    test_Y.reshape(1, -1)
+                )
+                # linear regression preformance metrics
+                mae_test_linear, mape_test_linear, smape_test_linear = get_error_metrics(
+                    test_labels, regression_predictions_test
+                )
+
+                # forecast preformance metrics
+                mae_test_forecast, mape_test_forecast, smape_test_forecast = get_error_metrics(
+                    test_labels, forecasts_test
+                )
+                seq_params_dict = {
+                    "MAE: test forecast": np.mean(mae_test_forecast),
+                    "MAE: test linear": np.mean(mae_test_linear),
+                    "MAPE: test forecast": np.mean(mae_test_forecast),
+                    "MAPE: test linear": np.mean(mae_test_linear),
+                    "SMAPE: test forecast": np.mean(smape_test_forecast),
+                    "SMAPE: test linear": np.mean(smape_test_linear),
+                }
+                for i, (k, v) in enumerate(seq_params_dict.items()):
+                    plt.text(
+                        1.0,
+                        0.7 - 0.032 * i,
+                        f"{k}={v:1.1f}",
+                        transform=plt.gca().transAxes,
+                        fontsize=15,
+                        alpha=0.6,
+                    )
+
+                # Append metrics to arrays for meta metrics analysis
+                actuals_test.extend(np.squeeze(test_labels))
+                # Linear Predictions
+                test_linear_mae.extend(mae_test_linear)
+                test_linear_mape.extend(mape_test_linear)
+                test_linear_smape.extend(smape_test_linear)
+                # Forecast Predictions
+                test_forecast_mae.extend(mae_test_forecast)
+                test_forecast_mape.extend(mape_test_forecast)
+                test_forecast_smape.extend(smape_test_forecast)
+
+            output_path = get_run_artifact_path(fips, RunArtifact.FORECAST_RESULT)
+            state_obj = us.states.lookup(state_name)
+            plt.savefig(output_path, bbox_inches="tight")
+            plt.close("all")
+
+        plot_percentile_error(
+            None, actuals_test, None, test_forecast_mae, "mae", self.predict_variable,
+        )
 
         if self.debug_plots:
             self.plot_variables(
@@ -965,7 +1029,6 @@ class ForecastRt:
         plt.savefig(output_path, bbox_inches="tight")
         plt.close("all")
 
-        print("starting percentile plots MAE")
         plot_percentile_error(
             actuals_train,
             actuals_test,
@@ -974,7 +1037,6 @@ class ForecastRt:
             "mae",
             self.predict_variable,
         )
-        print("MAPE")
         plot_percentile_error(
             actuals_train,
             actuals_test,
@@ -983,7 +1045,6 @@ class ForecastRt:
             "mape",
             self.predict_variable,
         )
-
         plot_percentile_error(
             actuals_train,
             actuals_test,
@@ -1370,12 +1431,6 @@ def align_time_series(series_a, series_b):
 
 
 def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
-    print(test_metric)
-    print(test_data)
-    # train_array = np.squeeze(np.concatenate(train_array))
-    # test_array = np.squeeze(np.concatenate(test_array))
-    # actuals_train = np.squeeze(np.concatenate(actuals_train))
-    # actuals_test = np.squeeze(np.concatenate(actuals_test))
     plt.close("all")
     plt.scatter(
         train_data, train_metric, label="Train", s=2, marker="*",
@@ -1386,7 +1441,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.legend()
     plt.xlabel(predict_var)
     plt.ylabel(label)
-    output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
+    output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
     plt.savefig(output_path + "_" + label + "_scatter.pdf", bbox_inches="tight")
 
     plt.close("all")
@@ -1394,20 +1449,19 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
 
     cut = pd.cut(df.value, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
-    counts = df.groupby(cut).agg(["count"])
+    counts = df.groupby(cut).agg(["mean", "median", "count"])
     print(counts)
     ax = sns.boxplot(data=boxdf)
     plt.xticks(rotation=30, fontsize=10)
-    plt.ylim(0, 100)
+    # plt.ylim(0, 100)
     plt.xlabel(predict_var)
     plt.ylabel(label)
     fig = ax.get_figure()
-    output_path = get_run_artifact_path("01", RunArtifact.FORECAST_RESULT)
-    plt.savefig(output_path + "_" + label + "_percentile.pdf", bbox_inches="tight")
+    output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
+    plt.savefig(output_path + "_" + label + ".pdf", bbox_inches="tight")
     ax = sns.swarmplot(data=boxdf, color=".25")
-    plt.savefig(output_path + "_" + label + "_swarm_percentile.pdf", bbox_inches="tight")
+    plt.savefig(output_path + "_" + label + "_swarm.pdf", bbox_inches="tight")
     df.to_csv(output_path + "_" + label + "_df.csv")
-    log.info("saved csv")
     return
 
 
