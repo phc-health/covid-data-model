@@ -507,8 +507,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 29  # 47
-        skip_test = 10  # 10
+        skip_train = 44  # 47
+        skip_test = 20  # 10
         if self.quick_test:
             skip_train = 0
             skip_test = 0
