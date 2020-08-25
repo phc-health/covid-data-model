@@ -83,7 +83,7 @@ class ForecastRt:
         self.fips_var_name_int = (
             "fips_int"  # name of fips used in forecast (cast from input string to int)
         )
-        self.quick_test = True
+        self.quick_test = False
         self.sim_date_name = "sim_day"
         self.index_col_name_csv = "date"
         self.cases_cumulative = True
@@ -176,7 +176,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1
+        self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -507,8 +507,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 29
-        skip_test = 10
+        skip_train = 47  # 29
+        skip_test = 10  # 10
         if self.quick_test:
             skip_train = 0
             skip_test = 0
@@ -568,7 +568,7 @@ class ForecastRt:
         output_path = get_run_artifact_path(fips, RunArtifact.MODEL)
         model.save(output_path)
         log.info(output_path)
-        log.info('SAVED model')
+        log.info("SAVED model")
         model.evaluate(final_list_train_X, final_list_train_Y)  # this gives actual loss
 
         forecast_model_skeleton = MyHyperModel(
