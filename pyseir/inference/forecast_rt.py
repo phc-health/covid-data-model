@@ -69,9 +69,9 @@ class ForecastRt:
         self.train = False
         self.infer_only_n_days = 45
         self.scaling_dictionary_file = (
-            "../covid-data-public/forecast_data/models/aug5_scaling_dicionary.pkl"
+            "../covid-data-public/forecast_data/models/scaling_dictionary.pkl"
         )
-        self.model_file = "../covid-data-public/forecast_data/models/test_model.h5"
+        self.model_file = "../covid-data-public/forecast_data/models/model.h5"
         self.save_csv_output = False  # do not set to true for github actions run
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
@@ -185,7 +185,7 @@ class ForecastRt:
         self.train_size = 0.8
         self.n_test_days = 10
         self.n_batch = 50
-        self.n_epochs = 1
+        self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
