@@ -67,7 +67,7 @@ class ForecastRt:
 
     def __init__(self, df_all=None):
         self.train = False
-        self.infer_only_n_days = 45
+        self.infer_only_n_days = 7
         self.scaling_dictionary_file = (
             "../covid-data-public/forecast_data/models/scaling_dictionary.pkl"
         )
@@ -191,12 +191,13 @@ class ForecastRt:
         self.patience = 30
         self.validation_split = 0  # currently using test set as validation set
         self.hyperparam_search = False
+        self.use_log_predict_var = True
 
     @classmethod
     def run_forecast(cls, df_all=None):
         engine = cls(df_all)
-        # return engine.forecast_rt()
-        return engine.infer_rt()
+        return engine.forecast()
+        # return engine.infer()
 
     def get_forecast_dfs(self, csvfile, mode):
         if self.merged_df is None or not self.states_only:
@@ -241,6 +242,10 @@ class ForecastRt:
             df[self.predict_variable] = (
                 df.iloc[:][self.raw_predict_variable].rolling(window=indexer).mean()
             )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
+            if self.use_log_predict_var:
+                df[self.predict_variable] = np.log10(df[self.predict_variable])
+                df[self.predict_variable] = df[self.predict_variable].replace([np.inf, -np.inf], 0)
+                df[self.predict_variable] = df[self.predict_variable].fillna(self.mask_value)
             # Calculate Rt derivative, exclude first row since-- zero derivative
             df[self.d_predict_variable] = df[self.predict_variable].diff()
 
@@ -251,9 +256,12 @@ class ForecastRt:
             if self.quick_test:
                 self.n_batch = 1
                 df = df[first_valid_index:].copy()
-                df = df[:45].copy()
+                df = df[:60].copy()
             if mode == "infer":
-                df = df[-self.infer_only_n_days :].copy()
+                start_date = self.infer_only_n_days + self.min_number_of_days + 19
+                end_date = start_date - 1
+                df = df[-(self.min_number_of_days + 16 + 3) : -16].copy()
+                print(df)
 
             df = df[first_valid_index:last_valid_index].copy()
 
@@ -468,10 +476,10 @@ class ForecastRt:
 
         return
 
-    def infer_rt(self):
+    def infer(self):
         compute_metrics = True
         area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs(
-            self.csv_test_path, "infer"
+            self.csv_path, "infer"
         )
         # Load Scaling Dictionary
         scalers_file = open(self.scaling_dictionary_file, "rb")
@@ -492,7 +500,7 @@ class ForecastRt:
         for df, fips in zip(area_df_list, area_fips):
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
-            test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "test")
+            test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "future")
             (
                 forecasts_test,
                 dates_test,
@@ -537,6 +545,7 @@ class ForecastRt:
                 test_labels = scalers_dict[self.predict_variable].inverse_transform(
                     test_Y.reshape(1, -1)
                 )
+
                 # linear regression preformance metrics
                 mae_test_linear, mape_test_linear, smape_test_linear = get_error_metrics(
                     test_labels, regression_predictions_test
@@ -583,13 +592,19 @@ class ForecastRt:
         plot_percentile_error(
             None, actuals_test, None, test_forecast_mae, "mae", self.predict_variable,
         )
+        plot_percentile_error(
+            None, actuals_test, None, test_forecast_mape, "mape", self.predict_variable,
+        )
+        plot_percentile_error(
+            None, actuals_test, None, test_forecast_smape, "smape", self.predict_variable,
+        )
 
         if self.debug_plots:
             self.plot_variables(
                 slim(area_df_list, self.forecast_variables), area_fips, scalers_dict
             )
 
-    def forecast_rt(self):
+    def forecast(self):
         """
         predict r_t for 14 days into the future
         Parameters
@@ -615,6 +630,7 @@ class ForecastRt:
         # Get scaling dictionary
         # TODO add max min rows to avoid domain adaption issues
         train_scaling_set = pd.concat(area_scaling_samples)
+        print(train_scaling_set.max())
         scalers_dict = self.get_scaling_dictionary(slim(train_scaling_set, self.forecast_variables))
         output_path = get_run_artifact_path(fips, RunArtifact.SCALING_DICTIONARY)
         f = open(output_path, "wb")
@@ -645,7 +661,7 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 44  # 47
+        skip_train = 37  # 47
         skip_test = 20  # 10
         if self.quick_test:
             skip_train = 0
@@ -778,6 +794,9 @@ class ForecastRt:
                 unscaled_forecasts_train,
                 regression_predictions_train,
             ) = self.get_forecasts(train_df, train_X, train_Y, scalers_dict, forecast_model)
+            print("train forecasts")
+            print(forecasts_train)
+            print(dates_train)
             (
                 forecasts_test,
                 dates_test,
@@ -838,6 +857,9 @@ class ForecastRt:
                 test_labels = scalers_dict[self.predict_variable].inverse_transform(
                     test_Y.reshape(1, -1)
                 )
+                if self.use_log_predict_var:
+                    test_labels = 10 ** test_labels
+                    train_labels = 10 ** train_labels
 
                 # linear regression preformance metrics
                 mae_train_linear, mape_train_linear, smape_train_linear = get_error_metrics(
@@ -909,10 +931,13 @@ class ForecastRt:
                         plt.plot(
                             newdates, j, color="orange", linewidth=MODEL_LINEWIDTH, markersize=0
                         )
-
+            if self.use_log_predict_var:
+                data = 10 ** area_df[self.predict_variable]
+            else:
+                data = area_df[self.predict_variable]
             plt.plot(
                 area_df.index,
-                area_df[self.predict_variable],
+                data,
                 label=self.predict_variable,
                 markersize=3,
                 marker=".",
@@ -1085,7 +1110,8 @@ class ForecastRt:
                 regr.fit(train_X, train_Y)
                 train_prediction_day = train_X[len(train_X) - 1].reshape(1, -1) + predict_out_days
                 train_prediction = regr.predict(train_prediction_day)
-
+                if self.use_log_predict_var:
+                    train_prediction = 10 ** train_prediction
                 regr_prediction.append(train_prediction)
 
             x = x.reshape(1, x.shape[0], x.shape[1])
@@ -1093,6 +1119,9 @@ class ForecastRt:
             thisforecast = scalers_dict[self.predict_variable].inverse_transform(
                 unscaled_prediction
             )
+            if self.use_log_predict_var:
+                thisforecast = 10 ** thisforecast
+
             forecasts.append(thisforecast)
             unscaled_predictions.append(unscaled_prediction)
             if label == "none":
@@ -1447,7 +1476,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.close("all")
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
 
-    cut = pd.cut(df.value, [0, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000, 10000],)
+    cut = pd.cut(df.value, [0, 20, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     counts = df.groupby(cut).agg(["mean", "median", "count"])
     print(counts)
