@@ -76,7 +76,7 @@ class ForecastRt:
         self.csv_output_folder = "./csv_files/"
         self.df_all = df_all
         self.states = "All"  # All to use All
-        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df.csv"
+        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
         self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
 
         self.merged_df = True  # set to true if input dataframe merges all areas
@@ -191,7 +191,7 @@ class ForecastRt:
         self.patience = 30
         self.validation_split = 0  # currently using test set as validation set
         self.hyperparam_search = False
-        self.use_log_predict_var = True
+        self.use_log_predict_var = False
 
     @classmethod
     def run_forecast(cls, df_all=None):
@@ -263,7 +263,6 @@ class ForecastRt:
                 df = df[-(31 + 18) :].copy()
 
             df = df[first_valid_index:last_valid_index].copy()
-            print(df)
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
@@ -673,8 +672,8 @@ class ForecastRt:
         final_list_test_X = np.concatenate(list_test_X)
         final_list_test_Y = np.concatenate(list_test_Y)
 
-        skip_train = 37  # 47
-        skip_test = 20  # 10
+        skip_train = 47  # 47
+        skip_test = 10  # 10
         if self.quick_test:
             skip_train = 0
             skip_test = 0
@@ -806,9 +805,6 @@ class ForecastRt:
                 unscaled_forecasts_train,
                 regression_predictions_train,
             ) = self.get_forecasts(train_df, train_X, train_Y, scalers_dict, forecast_model)
-            print("train forecasts")
-            print(forecasts_train)
-            print(dates_train)
             (
                 forecasts_test,
                 dates_test,
@@ -1488,7 +1484,7 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.close("all")
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
 
-    cut = pd.cut(df.value, [0, 30, 50, 100, 200, 300, 500, 1000, 3000],)
+    cut = pd.cut(df.value, [0, 20, 50, 100, 200, 300, 500, 1000, 3000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     counts = df.groupby(cut).agg(["mean", "median", "count"])
     print(counts)
