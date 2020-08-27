@@ -252,7 +252,7 @@ class ForecastRt:
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
             last_valid_index = df[self.predict_variable].last_valid_index()
-            df_invalid = df[:-1].copy()  # because last entry is from raw data is NaN TBD
+            df_invalid = df[-33:].copy()  # because last entry is from raw data is NaN TBD
             if self.quick_test:
                 self.n_batch = 1
                 df = df[first_valid_index:].copy()
@@ -260,10 +260,10 @@ class ForecastRt:
             if mode == "infer":
                 start_date = self.infer_only_n_days + self.min_number_of_days + 19
                 end_date = start_date - 1
-                df = df[-(self.min_number_of_days + 16 + 3) : -16].copy()
-                print(df)
+                df = df[-(31 + 18) :].copy()
 
             df = df[first_valid_index:last_valid_index].copy()
+            print(df)
 
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
@@ -478,8 +478,11 @@ class ForecastRt:
 
     def infer(self):
         compute_metrics = True
-        area_fips, area_df_list, area_df_invalid_list = self.get_forecast_dfs(
-            self.csv_path, "infer"
+        area_fips, area_df_list, area_df_list_invalid = self.get_forecast_dfs(
+            self.csv_test_path, "infer"
+        )
+        latest_area_fips, latest_area_df_list, latest_area_df_invalid_list = self.get_forecast_dfs(
+            self.csv_test_path, "future"
         )
         # Load Scaling Dictionary
         scalers_file = open(self.scaling_dictionary_file, "rb")
@@ -497,7 +500,7 @@ class ForecastRt:
         test_forecast_smape = []
         area_test_samples = []
 
-        for df, fips in zip(area_df_list, area_fips):
+        for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_list):
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
             test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "future")
@@ -527,8 +530,8 @@ class ForecastRt:
                 marker="o",
             )
             plt.plot(
-                df.index,
-                df[self.predict_variable],
+                latest_df.index,
+                latest_df[self.predict_variable],
                 label=self.predict_variable,
                 markersize=3,
                 marker=".",
@@ -542,9 +545,18 @@ class ForecastRt:
 
             # Compute metrics
             if compute_metrics:
-                test_labels = scalers_dict[self.predict_variable].inverse_transform(
-                    test_Y.reshape(1, -1)
-                )
+                # test_labels = scalers_dict[self.predict_variable].inverse_transform(
+                #    test_Y.reshape(1, -1)
+                # )
+                print(dates_test)
+                dates_test = [i.strftime("%Y-%m-%d") for i in dates_test]
+                latest_df["dates"] = latest_df.index.strftime("%Y-%m-%d")
+                test_labels = []
+                for i in dates_test:
+                    df = latest_df.loc[latest_df.dates.isin(i)]
+                    test_labels.append(df.iloc[0][self.predict_variable])
+                print(test_labels)
+                print(forecasts_test)
 
                 # linear regression preformance metrics
                 mae_test_linear, mape_test_linear, smape_test_linear = get_error_metrics(
@@ -1476,13 +1488,14 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.close("all")
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
 
-    cut = pd.cut(df.value, [0, 20, 50, 100, 200, 300, 500, 1000, 2000, 4000, 6000],)
+    cut = pd.cut(df.value, [0, 30, 50, 100, 200, 300, 500, 1000, 3000],)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     counts = df.groupby(cut).agg(["mean", "median", "count"])
     print(counts)
     ax = sns.boxplot(data=boxdf)
     plt.xticks(rotation=30, fontsize=10)
-    # plt.ylim(0, 100)
+    if label == "mae":
+        plt.ylim(0, 500)
     plt.xlabel(predict_var)
     plt.ylabel(label)
     fig = ax.get_figure()
