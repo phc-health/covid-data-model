@@ -66,24 +66,30 @@ class ForecastRt:
     """
 
     def __init__(self, df_all=None):
-        self.train = False
+        # self.train = False
+        # For inference
         self.infer_only_n_days = 7
         self.scaling_dictionary_file = (
-            "../covid-data-public/forecast_data/models/scaling_dictionary.pkl"
+            "../covid-data-public/forecast_data/models/scaling_dictionary_8_24.pkl"
         )
-        self.model_file = "../covid-data-public/forecast_data/models/model.h5"
-        self.save_csv_output = False  # do not set to true for github actions run
-        self.csv_output_folder = "./csv_files/"
+        self.model_file = "../covid-data-public/forecast_data/models/model_8_24.h5"
+        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to infer/train on
+        self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to retrieve ground truth from
+        self.compare_google = False  # not functional yet
+        self.google_predict_date = "2020-08-24"
+        self.google_test_path = "./google_covid_forecasts.csv"
+
+        # For Training
+        self.quick_test = False
         self.df_all = df_all
         self.states = "All"  # All to use All
-        self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
-        self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest.csv"
-
         self.merged_df = True  # set to true if input dataframe merges all areas
         self.states_only = True  # set to true if you only want to train on state level data (county level training not implemented...yet)
         self.ref_date = datetime(year=2020, month=1, day=1)
         self.debug_plots = False
         self.debug_output = False
+        self.save_csv_output = False  # do not set to true for github actions run
+        self.csv_output_folder = "./csv_files/"
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
         self.state_aggregate_level_name = "state"
@@ -92,7 +98,6 @@ class ForecastRt:
         self.fips_var_name_int = (
             "fips_int"  # name of fips used in forecast (cast from input string to int)
         )
-        self.quick_test = False
         self.sim_date_name = "sim_day"
         self.index_col_name_csv = "date"
         self.cases_cumulative = True
@@ -102,7 +107,6 @@ class ForecastRt:
         self.daily_var_prefix = "new_"
         self.daily_case_var = self.daily_var_prefix + self.case_var
         self.daily_death_var = self.daily_var_prefix + self.death_var
-        # self.predict_variable = "Rt_MAP__new_cases"
 
         self.raw_predict_variable = self.daily_case_var
         self.predict_variable = "smooth_future_new_cases"
@@ -168,36 +172,42 @@ class ForecastRt:
             # "smooth_unsmoothed_community",
             # "smoothed_community",
         ]
-        self.scaled_variable_suffix = "_scaled"
+        self.scaled_variable_suffix = (
+            "_scaled"  # suffix added to variables in input dataframes once the variables are scaled
+        )
 
         # Seq2Seq Parameters
-        self.max_scaling = 2  # multiply max feature values by this number for scaling set
-        self.min_scaling = 0.5  # multiply min feature values by this number of scaling set
-        self.days_between_samples = 1
+        self.max_scaling = (
+            2  # multiply max feature values by this number for scaling set (currently not used)
+        )
+        self.min_scaling = (
+            0.5  # multiply min feature values by this number of scaling set (currently not used)
+        )
+        self.days_between_samples = 1  # number of days required between samples
         self.mask_value = -10
         self.min_number_of_days = 31
         self.sequence_length = (
             30  # can pad sequence with numbers up to this length if input lenght is variable
         )
         self.sample_train_length = 30  # Set to -1 to use all historical data
-        self.predict_days = 1
+        self.predict_days = 1  # how many days to predict
         self.percent_train = False
         self.train_size = 0.8
-        self.n_test_days = 10
-        self.n_batch = 50
+        self.n_test_days = 10  # if not using a percentage of the sample set for training, use the last n_test_days as the training set
+        self.n_batch = 50  # number of train and test samples needs to be divisible by batch size
         self.n_epochs = 1000
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
         self.validation_split = 0  # currently using test set as validation set
         self.hyperparam_search = False
-        self.use_log_predict_var = False
+        self.use_log_predict_var = False  # does not seem to work
 
     @classmethod
     def run_forecast(cls, df_all=None):
         engine = cls(df_all)
-        return engine.forecast()
-        # return engine.infer()
+        # return engine.forecast() #train
+        return engine.infer()  # using a prebuild model and some input csv
 
     def get_forecast_dfs(self, csvfile, mode):
         if self.merged_df is None or not self.states_only:
@@ -475,6 +485,41 @@ class ForecastRt:
 
         return
 
+    def get_google_forecasts(self, fips, dates):
+        google_df = pd.read_csv(self.google_test_path)
+        dates_str = [i.strftime("%Y-%m-%d") for i in dates]
+
+        google_df["str_prediction_date"] = google_df["prediction_date"].astype(str)
+        google_df["str_forecast_date"] = google_df["forecast_date"].astype(str)
+        print(google_df.dtypes)
+        print(google_df["str_prediction_date"])
+        state_df = google_df[google_df["state_fips_code"] == int(fips)]
+        state_df = state_df[state_df["str_forecast_date"] == self.google_predict_date]
+        # state_df = state_df.sort_values(by=['str_prediction_date'])
+        # state_df.to_csv('al.csv')
+        google_forecasts = []
+        for i in dates_str:
+            print("i")
+            print(i[0])
+            print(type(i[0]))
+            state_df = state_df[state_df["str_prediction_date"] == i[0]]
+            print(type(state_df))
+            print(state_df["new_confirmed"].values[0])
+
+            google_forecasts.append(state_df["new_confirmed"].values[0])
+        print(google_forecasts)
+
+        exit()
+
+        # state_df = state_df
+
+        #          dates_test = [i.strftime("%Y-%m-%d") for i in dates_test]
+        #          latest_df["dates"] = latest_df.index.strftime("%Y-%m-%d")
+        #          test_labels = []
+        #          for i in dates_test:
+        #              df = latest_df.loc[latest_df.dates.isin(i)]
+        #              test_labels.append(df.iloc[0][self.predict_variable])
+
     def infer(self):
         compute_metrics = True
         area_fips, area_df_list, area_df_list_invalid = self.get_forecast_dfs(
@@ -509,6 +554,10 @@ class ForecastRt:
                 unscaled_forecasts_test,
                 regression_predictions_test,
             ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
+
+            if self.compare_google:
+                forecasts_google = self.get_google_forecasts(fips, dates_test)
+
             plt.figure(figsize=(18, 12))
             fips = samples[0]["fips"][0]
             state_name = us.states.lookup(fips).name
@@ -547,15 +596,12 @@ class ForecastRt:
                 # test_labels = scalers_dict[self.predict_variable].inverse_transform(
                 #    test_Y.reshape(1, -1)
                 # )
-                print(dates_test)
                 dates_test = [i.strftime("%Y-%m-%d") for i in dates_test]
                 latest_df["dates"] = latest_df.index.strftime("%Y-%m-%d")
                 test_labels = []
                 for i in dates_test:
                     df = latest_df.loc[latest_df.dates.isin(i)]
                     test_labels.append(df.iloc[0][self.predict_variable])
-                print(test_labels)
-                print(forecasts_test)
 
                 # linear regression preformance metrics
                 mae_test_linear, mape_test_linear, smape_test_linear = get_error_metrics(
@@ -566,6 +612,7 @@ class ForecastRt:
                 mae_test_forecast, mape_test_forecast, smape_test_forecast = get_error_metrics(
                     test_labels, forecasts_test
                 )
+
                 seq_params_dict = {
                     "MAE: test forecast": np.mean(mae_test_forecast),
                     "MAE: test linear": np.mean(mae_test_linear),
