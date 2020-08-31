@@ -1,6 +1,7 @@
 from typing import List, Optional
 from libs.enums import Intervention
 from libs.datasets.dataset_utils import AggregationLevel
+from api import can_api_definition
 from libs import us_state_abbrev
 from libs import base_model
 import pydantic
@@ -8,10 +9,10 @@ import datetime
 
 
 class HospitalResourceUtilization(base_model.APIBaseModel):
-    capacity: int
+    capacity: Optional[int]
     currentUsageTotal: Optional[int]
-    currentUsageCovid: int
-    typicalUsageRate: float
+    currentUsageCovid: Optional[int]
+    typicalUsageRate: Optional[float]
 
 
 class Actuals(base_model.APIBaseModel):
@@ -29,16 +30,47 @@ class Actuals(base_model.APIBaseModel):
     )
     positiveTests: Optional[int]
     negativeTests: Optional[int]
-    tests: Optional[int]
+    contactTracers: Optional[int] = pydantic.Field(default=None, description="# of Contact Tracers")
     hospitalBeds: Optional[HospitalResourceUtilization] = pydantic.Field(...)
     icuBeds: Optional[HospitalResourceUtilization] = pydantic.Field(...)
-    contactTracers: Optional[int] = pydantic.Field(default=None, description="# of Contact Tracers")
 
 
 class ActualsTimeseriesRow(Actuals):
     """Actual data for a specific day."""
 
     date: datetime.date = pydantic.Field(..., descrition="Date of timeseries data point")
+
+
+class Metrics(base_model.APIBaseModel):
+    """Calculated metrics data based on known actuals."""
+
+    testPositivityRatio: Optional[float] = pydantic.Field(
+        ...,
+        description="Ratio of people who test positive calculated using a 7-day rolling average.",
+    )
+
+    caseDensity: Optional[float] = pydantic.Field(
+        ...,
+        description="The number of cases per 100k population calculated using a 7-day rolling average.",
+    )
+
+    contactTracerCapacityRatio: Optional[float] = pydantic.Field(
+        ...,
+        description=(
+            "Ratio of currently hired tracers to estimated "
+            "tracers needed based on 7-day daily case average."
+        ),
+    )
+
+    infectionRate: Optional[float] = pydantic.Field(
+        ..., description="R_t, or the estimated number of infections arising from a typical case."
+    )
+
+    infectionRateCI90: Optional[float] = pydantic.Field(
+        ..., description="90th percentile confidence interval upper endpoint of the infection rate."
+    )
+    icuHeadroomRatio: Optional[float] = pydantic.Field(...)
+    icuHeadroomDetails: Optional[can_api_definition.ICUHeadroomMetricDetails] = pydantic.Field(None)
 
 
 class MetricsTimeseriesRow(Metrics):
@@ -50,22 +82,22 @@ class MetricsTimeseriesRow(Metrics):
 class RegionSummary(base_model.APIBaseModel):
     """Summary of actual and prediction data for a single region."""
 
-    countryName: str = "US"
     fips: str = pydantic.Field(
         ...,
         description="Fips Code.  For state level data, 2 characters, for county level data, 5 characters.",
     )
+    country: str = "US"
+    state: str = pydantic.Field(..., description="The state name")
+    county: Optional[str] = pydantic.Field(default=None, description="The county name")
     lat: Optional[float] = pydantic.Field(
         ..., description="Latitude of point within the state or county"
     )
     long: Optional[float] = pydantic.Field(
         ..., description="Longitude of point within the state or county"
     )
-    stateName: str = pydantic.Field(..., description="The state name")
     population: int = pydantic.Field(
         ..., description="Total Population in geographic region.", gt=0
     )
-    countyName: Optional[str] = pydantic.Field(default=None, description="The county name")
     lastUpdatedDate: datetime.date = pydantic.Field(..., description="Date of latest data")
 
     metrics: Optional[Metrics] = pydantic.Field(...)
@@ -78,19 +110,6 @@ class RegionSummary(base_model.APIBaseModel):
 
         if len(self.fips) == 5:
             return AggregationLevel.COUNTY
-
-    @property
-    def state(self) -> str:
-        """State abbreviation."""
-        return us_state_abbrev.US_STATE_ABBREV[self.stateName]
-
-    def output_key(self, *args):
-
-        if self.aggregate_level is AggregationLevel.STATE:
-            return f"{self.state}"
-
-        if self.aggregate_level is AggregationLevel.COUNTY:
-            return f"{self.fips}"
 
 
 class RegionSummaryWithTimeseries(RegionSummary):
@@ -118,12 +137,9 @@ class AggregateRegionSummary(base_model.APIBaseModel):
 
     __root__: List[RegionSummary] = pydantic.Field(...)
 
-    def output_key(self, *args):
-        aggregate_level = self.__root__[0].aggregate_level
-        if aggregate_level is AggregationLevel.COUNTY:
-            return f"counties"
-        if aggregate_level is AggregationLevel.STATE:
-            return f"states"
+    @property
+    def aggregate_level(self) -> AggregationLevel:
+        return self.__root__[0].aggregate_level
 
 
 class AggregateRegionSummaryWithTimeseries(base_model.APIBaseModel):
@@ -131,21 +147,17 @@ class AggregateRegionSummaryWithTimeseries(base_model.APIBaseModel):
 
     __root__: List[RegionSummaryWithTimeseries] = pydantic.Field(...)
 
-    def output_key(self, *args):
-        aggregate_level = self.__root__[0].aggregate_level
-        if aggregate_level is AggregationLevel.COUNTY:
-            return f"counties.timeseries"
-        if aggregate_level is AggregationLevel.STATE:
-            return f"states.timeseries"
+    @property
+    def aggregate_level(self) -> AggregationLevel:
+        return self.__root__[0].aggregate_level
 
 
 class MetricsTimeseriesRowWithHeader(MetricsTimeseriesRow):
     """Prediction timeseries row with location information."""
 
-    countryName: str = "US"
-    stateName: str = pydantic.Field(..., description="The state name")
-    countyName: Optional[str] = pydantic.Field(..., description="The county name")
-    intervention: str = pydantic.Field(..., description="Name of high-level intervention in-place")
+    country: str = "US"
+    state: str = pydantic.Field(..., description="The state name")
+    county: Optional[str] = pydantic.Field(..., description="The county name")
     fips: str = pydantic.Field(..., description="Fips for State + County. Five character code")
     lat: Optional[float] = pydantic.Field(
         ..., description="Latitude of point within the state or county"
@@ -171,15 +183,4 @@ class AggregateFlattenedTimeseries(base_model.APIBaseModel):
 
     @property
     def aggregate_level(self) -> AggregationLevel:
-        if len(self.fips) == 2:
-            return AggregationLevel.STATE
-
-        if len(self.fips) == 5:
-            return AggregationLevel.COUNTY
-
-    def output_key(self, *args):
-        aggregate_level = self.__root__[0].aggregate_level
-        if aggregate_level is AggregationLevel.COUNTY:
-            return f"counties.timeseries"
-        if aggregate_level is AggregationLevel.STATE:
-            return f"states.timeseries"
+        return self.__root__[0].aggregate_level

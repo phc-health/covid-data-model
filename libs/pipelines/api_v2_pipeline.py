@@ -47,10 +47,10 @@ class RegionalInput:
         return self._combined_data.get_us_latest()
 
     def get_us_timeseries(self):
-        return self._combined_data.get_us_timeseries()
+        return self._combined_data.get_timeseries()
 
     @staticmethod
-    def from_region(region: pipeline.Region, model_output_dir: pathlib.Path) -> "RegionalInput":
+    def from_region_and_model_output(region: pipeline.Region, model_output_dir) -> "RegionalInput":
         combined_data = pipeline.RegionalCombinedData.from_region(region)
 
         model_output = CANPyseirLocationOutput.load_from_model_output_if_exists(
@@ -61,17 +61,15 @@ class RegionalInput:
 
 def run_on_regions(
     regional_inputs: List[RegionalInput],
-    model_output_dir: pathlib.Path,
     pool: multiprocessing.Pool = None,
     sort_func=None,
     limit=None,
 ) -> Iterator[RegionSummaryWithTimeseries]:
-    run_region = functools.partial(build_timeseries_for_region, model_output_dir)
-
     # Setting maxtasksperchild to one ensures that we minimize memory usage over time by creating
     # a new child for every task. Addresses OOMs we saw on highly parallel build machine.
+
     pool = pool or multiprocessing.Pool(maxtasksperchild=1)
-    results = pool.map(run_region)
+    results = map(build_timeseries_for_region, regional_inputs)
     all_timeseries = []
 
     for region_timeseries in results:
@@ -101,14 +99,11 @@ def generate_metrics_and_latest_for_fips(
     Returns:
         Tuple of MetricsTimeseriesRows for all days and the latest.
     """
-    metrics_results = top_level_metrics.calculate_metrics_for_timeseries(
+    metrics_results, latest = top_level_metrics.calculate_metrics_for_timeseries(
         timeseries, latest, model_output
     )
     metrics_timeseries = metrics_results.to_dict(orient="records")
     metrics_for_fips = [MetricsTimeseriesRow(**metric_row) for metric_row in metrics_timeseries]
-    latest = None
-    if metrics_for_fips:
-        latest = top_level_metrics.calculate_latest_metrics(metrics_results)
 
     return metrics_for_fips, latest
 
@@ -124,11 +119,9 @@ def build_timeseries_for_region(
         metrics_timeseries, metrics_latest = generate_metrics_and_latest_for_fips(
             fips_timeseries, fips_latest, model_output
         )
-        region_summary = generate_api_v2.generate_region_summary(
-            fips_latest, metrics_latest, model_output
-        )
+        region_summary = generate_api_v2.generate_region_summary(fips_latest, metrics_latest)
         region_timeseries = generate_api_v2.generate_region_timeseries(
-            region_summary, fips_timeseries, metrics_timeseries, model_output
+            region_summary, fips_timeseries, metrics_timeseries
         )
     except Exception:
         logger.exception(f"Failed to build timeseries for fips.")
@@ -151,7 +144,7 @@ def deploy_single_level(all_timeseries, path_builder: APIOutputPathBuilder):
     if not all_timeseries:
         return
     all_summaries = []
-    deploy_timeseries_partial = functools.partial(_deploy_timeseries, region_folder)
+    deploy_timeseries_partial = functools.partial(_deploy_timeseries, path_builder)
     all_summaries = [
         deploy_timeseries_partial(region_timeseries) for region_timeseries in all_timeseries
     ]
@@ -162,14 +155,14 @@ def deploy_single_level(all_timeseries, path_builder: APIOutputPathBuilder):
     output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON)
     deploy_json_api_output(bulk_timeseries, output_path)
 
-    output_path = path_builder.bulk_prediction_data(flattened_timeseries, FileType.CSV)
-    deploy_csv_api_output(flattened_timeseries, summary_folder)
+    # output_path = path_builder.bulk_prediction_data(flattened_timeseries, FileType.CSV)
+    # deploy_csv_api_output(flattened_timeseries, summary_folder)
 
-    output_path = path_builder.bulk_summaries(bulk_summaries, FileType.JSON)
+    output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON)
     deploy_json_api_output(bulk_summaries, output_path)
 
-    output_path = path_builder.bulk_summaries(bulk_summaries, FileType.CSV)
-    deploy_csv_api_output(bulk_summaries, summary_folder)
+    output_path = path_builder.bulk_summary(bulk_summaries, FileType.CSV)
+    deploy_csv_api_output(bulk_summaries, output_path)
 
 
 def deploy_json_api_output(
@@ -183,15 +176,10 @@ def deploy_json_api_output(
 
 
 def deploy_csv_api_output(
-    api_output: pydantic.BaseModel, output_dir: pathlib.Path, filename_override=None,
+    api_output: pydantic.BaseModel, output_path: pathlib.Path, filename_override=None,
 ):
     if not hasattr(api_output, "__root__"):
         raise AssertionError("Missing root data")
 
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-    filename = filename_override or (api_output.output_key() + ".csv")
-    output_path = output_dir / filename
     rows = dataset_deployer.remove_root_wrapper(api_output.dict())
     dataset_deployer.write_nested_csv(rows, output_path)
