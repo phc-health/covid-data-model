@@ -22,7 +22,7 @@ class JHUDataset(data_source.DataSource):
 
     DATA_FOLDER = "data/cases-jhu/csse_covid_19_daily_reports"
     SOURCE_NAME = "JHU"
-    HAS_AGGREGATED_NYC_BOROUGH = True
+    HAS_AGGREGATED_NYC_BOROUGH = False
 
     class Fields(object):
         FIPS = "FIPS"
