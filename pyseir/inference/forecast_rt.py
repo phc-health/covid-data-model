@@ -68,14 +68,14 @@ class ForecastRt:
     def __init__(self, df_all=None):
         # self.train = False
         # For inference
-        self.infer_only_n_days = 7
+        self.infer_only_n_days = 3
         self.scaling_dictionary_file = (
             "../covid-data-public/forecast_data/models/scaling_dictionary_8_24.pkl"
         )
         self.model_file = "../covid-data-public/forecast_data/models/model_8_24.h5"
         self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to infer/train on
         self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to retrieve ground truth from
-        self.compare_google = False  # not functional yet
+        self.compare_google = True  # not functional yet
         self.google_predict_date = "2020-08-24"
         self.google_test_path = "./google_covid_forecasts.csv"
 
@@ -90,6 +90,7 @@ class ForecastRt:
         self.debug_output = False
         self.save_csv_output = False  # do not set to true for github actions run
         self.csv_output_folder = "./csv_files/"
+
         # Variable Names
         self.aggregate_level_name = "aggregate_level"
         self.state_aggregate_level_name = "state"
@@ -107,7 +108,6 @@ class ForecastRt:
         self.daily_var_prefix = "new_"
         self.daily_case_var = self.daily_var_prefix + self.case_var
         self.daily_death_var = self.daily_var_prefix + self.death_var
-
         self.raw_predict_variable = self.daily_case_var
         self.predict_variable = "smooth_future_new_cases"
         self.d_predict_variable = f"d_{self.predict_variable}"
@@ -193,9 +193,9 @@ class ForecastRt:
         self.predict_days = 1  # how many days to predict
         self.percent_train = False
         self.train_size = 0.8
-        self.n_test_days = 10  # if not using a percentage of the sample set for training, use the last n_test_days as the training set
+        self.n_test_days = 2  # if not using a percentage of the sample set for training, use the last n_test_days as the training set
         self.n_batch = 50  # number of train and test samples needs to be divisible by batch size
-        self.n_epochs = 1000
+        self.n_epochs = 2
         self.n_hidden_layer_dimensions = 100
         self.dropout = 0
         self.patience = 30
@@ -262,18 +262,16 @@ class ForecastRt:
             # Only keep data points where predict variable exists
             first_valid_index = df[self.predict_variable].first_valid_index()
             last_valid_index = df[self.predict_variable].last_valid_index()
-            df_invalid = df[-33:].copy()  # because last entry is from raw data is NaN TBD
+            df_invalid = df[-34:].copy()  # because last entry is from raw data is NaN TBD
             if self.quick_test:
                 self.n_batch = 1
                 df = df[first_valid_index:].copy()
                 df = df[:60].copy()
-            if mode == "infer":
-                start_date = self.infer_only_n_days + self.min_number_of_days + 19
-                end_date = start_date - 1
-                df = df[-(31 + 18) :].copy()
-
-            df = df[first_valid_index:last_valid_index].copy()
-
+            elif mode == "infer":  # want to keep dates that have incomplete datastreams
+                start_date = self.infer_only_n_days + self.min_number_of_days + 1
+                df = df[-start_date:].copy()
+            else:  # otherwise we are training and need to train with complete datastreams
+                df = df[first_valid_index:last_valid_index].copy()
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
             # TODO decide if first and last entry need to be removed
 
@@ -337,7 +335,7 @@ class ForecastRt:
 
     def get_train_test_samples(self, df_forecast):
         # True if test samples are constrained to be latest samples
-        test_set_end_of_sample = False
+        test_set_end_of_sample = True
 
         # create list of dataframe samples
         df_samples = self.create_samples(df_forecast)
@@ -357,16 +355,16 @@ class ForecastRt:
             test_samples = df_samples[first_test_index:]
             if 1 == 0:
                 # if self.save_csv_output:
-                for i in range(len(train_samples_not_spaced)):
-                    df = train_samples_not_spaced[i]
-                    if self.save_csv_output:
-                        df.to_csv(self.csv_output_folder + "df" + str(i) + "_train-notspaced.csv")
+                # for i in range(len(train_samples_not_spaced)):
+                #    df = train_samples_not_spaced[i]
+                #    if self.save_csv_output:
+                #        df.to_csv(self.csv_output_folder + "df" + str(i) + "_train-notspaced.csv")
 
                 for i in range(len(test_samples)):
                     df = test_samples[i]
-                    if self.save_csv_output:
-                        df.to_csv(self.csv_output_folder + "df" + str(i) + "_test-notspaced.csv")
-            # For traning only keep samples that are days_between_samples apart (avoid forecast learning meaningless correlations between labels)
+                    # if self.save_csv_output:
+                    df.to_csv(self.csv_output_folder + "df" + str(i) + "_test-notspaced.csv")
+            # For training only keep samples that are days_between_samples apart (avoid forecast learning meaningless correlations between labels)
             train_samples = train_samples_not_spaced[0 :: self.days_between_samples]
 
         else:  # test and train set randomly selected from sample set
@@ -491,34 +489,28 @@ class ForecastRt:
 
         google_df["str_prediction_date"] = google_df["prediction_date"].astype(str)
         google_df["str_forecast_date"] = google_df["forecast_date"].astype(str)
-        print(google_df.dtypes)
-        print(google_df["str_prediction_date"])
         state_df = google_df[google_df["state_fips_code"] == int(fips)]
         state_df = state_df[state_df["str_forecast_date"] == self.google_predict_date]
-        # state_df = state_df.sort_values(by=['str_prediction_date'])
-        # state_df.to_csv('al.csv')
+        state_df = state_df.sort_values(by=["str_prediction_date"])
+        state_df["raw_new_cases_all"] = state_df["new_confirmed_ground_truth"].fillna(
+            state_df["new_confirmed"]
+        )
+        indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=self.window_size)
+        state_df["new_cases_all"] = (
+            state_df.iloc[:]["raw_new_cases_all"].rolling(window=indexer).mean()
+        )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
+        state_df.to_csv("al.csv")
         google_forecasts = []
         for i in dates_str:
             print("i")
             print(i[0])
             print(type(i[0]))
-            state_df = state_df[state_df["str_prediction_date"] == i[0]]
-            print(type(state_df))
-            print(state_df["new_confirmed"].values[0])
-
-            google_forecasts.append(state_df["new_confirmed"].values[0])
+            thisdf = state_df[state_df["str_prediction_date"] == str(i[0])].copy()
+            thisdf.to_csv(str(i[0]) + ".csv")
+            print(thisdf["new_cases_all"].values[0])
+            google_forecasts.append(thisdf["new_cases_all"].values[0])
         print(google_forecasts)
-
-        exit()
-
-        # state_df = state_df
-
-        #          dates_test = [i.strftime("%Y-%m-%d") for i in dates_test]
-        #          latest_df["dates"] = latest_df.index.strftime("%Y-%m-%d")
-        #          test_labels = []
-        #          for i in dates_test:
-        #              df = latest_df.loc[latest_df.dates.isin(i)]
-        #              test_labels.append(df.iloc[0][self.predict_variable])
+        return google_forecasts
 
     def infer(self):
         compute_metrics = True
@@ -545,6 +537,7 @@ class ForecastRt:
         area_test_samples = []
 
         for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_list):
+            print("IN LOOP")
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
             test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "future")
@@ -554,6 +547,8 @@ class ForecastRt:
                 unscaled_forecasts_test,
                 regression_predictions_test,
             ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
+            print("dates test")
+            print(dates_test)
 
             if self.compare_google:
                 forecasts_google = self.get_google_forecasts(fips, dates_test)
