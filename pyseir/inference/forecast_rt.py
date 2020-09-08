@@ -74,7 +74,7 @@ class ForecastRt:
         )
         self.model_file = "../covid-data-public/forecast_data/models/model_8_24.h5"
         self.csv_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to infer/train on
-        self.csv_test_path = "../covid-data-public/forecast_data/merged_delphi_df_latest_8_27.csv"  # file to retrieve ground truth from
+        self.csv_test_path = "../covid-data-public/forecast_data/sept7_timeseries.csv"  # file to retrieve ground truth from
         self.compare_google = True  # not functional yet
         self.google_predict_date = "2020-08-24"
         self.google_test_path = "./google_covid_forecasts.csv"
@@ -244,9 +244,10 @@ class ForecastRt:
             df["new_positive_tests"] = df["positive_tests"].diff()
             df["new_negative_tests"] = df["negative_tests"].diff()
 
-            for var in self.smooth_variables:
-                df[f"smooth_{var}"] = df.iloc[:][var].rolling(window=self.window_size).mean()
-                df[f"d_smooth_{var}"] = df[f"smooth_{var}"].diff()
+            if mode != "future":
+                for var in self.smooth_variables:
+                    df[f"smooth_{var}"] = df.iloc[:][var].rolling(window=self.window_size).mean()
+                    df[f"d_smooth_{var}"] = df[f"smooth_{var}"].diff()
             # Calculate average of predict variable
             indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=self.window_size)
             df[self.predict_variable] = (
@@ -288,7 +289,8 @@ class ForecastRt:
             df_forecast_list.append(df_forecast)
             df_invalid_list.append(df_forecast_invalid)
             df_list.append(df)
-            df_slim = slim(df_forecast, self.forecast_variables)
+            if mode != "future":
+                df_slim = slim(df_forecast, self.forecast_variables)
 
             if 1 == 0:
                 # if self.debug_plots:
@@ -498,24 +500,18 @@ class ForecastRt:
         indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=self.window_size)
         state_df["new_cases_all"] = (
             state_df.iloc[:]["raw_new_cases_all"].rolling(window=indexer).mean()
-        )  # this just grabs the value of the variable 5 days forward, it is not a mean and I dunno why
-        state_df.to_csv("al.csv")
+        )  # this just grabs the value of the variable self.window_size days forward, it is not a mean and I dunno why
         google_forecasts = []
         for i in dates_str:
-            print("i")
-            print(i[0])
-            print(type(i[0]))
             thisdf = state_df[state_df["str_prediction_date"] == str(i[0])].copy()
             thisdf.to_csv(str(i[0]) + ".csv")
-            print(thisdf["new_cases_all"].values[0])
             google_forecasts.append(thisdf["new_cases_all"].values[0])
-        print(google_forecasts)
         return google_forecasts
 
     def infer(self):
         compute_metrics = True
         area_fips, area_df_list, area_df_list_invalid = self.get_forecast_dfs(
-            self.csv_test_path, "infer"
+            self.csv_path, "infer"
         )
         latest_area_fips, latest_area_df_list, latest_area_df_invalid_list = self.get_forecast_dfs(
             self.csv_test_path, "future"
@@ -534,9 +530,12 @@ class ForecastRt:
         test_forecast_mae = []
         test_forecast_mape = []
         test_forecast_smape = []
+        test_google_mae = []
+        test_google_mape = []
+        test_google_smape = []
         area_test_samples = []
 
-        for df, fips, latest_df in zip(area_df_list, area_fips, area_df_list_invalid):
+        for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_invalid_list):
             print("IN LOOP")
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
@@ -549,9 +548,11 @@ class ForecastRt:
             ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
             print("dates test")
             print(dates_test)
+            print(forecasts_test)
 
             if self.compare_google:
                 forecasts_google = self.get_google_forecasts(fips, dates_test)
+                print(forecasts_google)
 
             plt.figure(figsize=(18, 12))
             fips = samples[0]["fips"][0]
@@ -560,7 +561,7 @@ class ForecastRt:
                 np.squeeze(dates_test),
                 np.squeeze(forecasts_test),
                 color="orange",
-                label="Test",
+                label="Seq2Seq Forecast",
                 linewidth=0,
                 markersize=5,
                 marker="*",
@@ -568,21 +569,21 @@ class ForecastRt:
             plt.scatter(
                 np.squeeze(dates_test),
                 np.squeeze(forecasts_google),
-                color = 'blue',
-                marker = 'o',
-                label = "Google"
-                )
+                color="blue",
+                marker="o",
+                label="Google Forecast",
+            )
             plt.scatter(
                 np.squeeze(dates_test),
                 np.squeeze(regression_predictions_test),
                 color="purple",
-                label="Test Linear",
+                label="Linear Forecast",
                 marker="o",
             )
             plt.plot(
                 latest_df.index,
                 latest_df[self.predict_variable],
-                label=self.predict_variable,
+                label="Data",
                 markersize=3,
                 marker=".",
                 linewidth=3,
@@ -615,6 +616,11 @@ class ForecastRt:
                     test_labels, forecasts_test
                 )
 
+                # forecast preformance metrics
+                mae_test_google, mape_test_google, smape_test_google = get_error_metrics(
+                    test_labels, forecasts_google
+                )
+
                 seq_params_dict = {
                     "MAE: test forecast": np.mean(mae_test_forecast),
                     "MAE: test linear": np.mean(mae_test_linear),
@@ -639,6 +645,10 @@ class ForecastRt:
                 test_linear_mae.extend(mae_test_linear)
                 test_linear_mape.extend(mape_test_linear)
                 test_linear_smape.extend(smape_test_linear)
+                # Google Predictions
+                test_google_mae.extend(mae_test_google)
+                test_google_mape.extend(mape_test_google)
+                test_google_smape.extend(smape_test_google)
                 # Forecast Predictions
                 test_forecast_mae.extend(mae_test_forecast)
                 test_forecast_mape.extend(mape_test_forecast)
@@ -650,13 +660,18 @@ class ForecastRt:
             plt.close("all")
 
         plot_percentile_error(
-            None, actuals_test, None, test_forecast_mae, "mae", self.predict_variable,
+            None, actuals_test, test_google_mae, test_forecast_mae, "mae", self.predict_variable,
         )
         plot_percentile_error(
-            None, actuals_test, None, test_forecast_mape, "mape", self.predict_variable,
+            None, actuals_test, test_google_mape, test_forecast_mape, "mape", self.predict_variable,
         )
         plot_percentile_error(
-            None, actuals_test, None, test_forecast_smape, "smape", self.predict_variable,
+            None,
+            actuals_test,
+            test_google_smape,
+            test_forecast_smape,
+            "smape",
+            self.predict_variable,
         )
 
         if self.debug_plots:
@@ -1518,9 +1533,9 @@ def align_time_series(series_a, series_b):
 
 def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
     plt.close("all")
-    plt.scatter(
-        train_data, train_metric, label="Train", s=2, marker="*",
-    )
+    # plt.scatter(
+    #    train_data, train_metric, label="Train", s=2, marker="*",
+    # )
     plt.scatter(
         test_data, test_metric, label="Test", s=2, marker="*",
     )
@@ -1531,13 +1546,33 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
     plt.savefig(output_path + "_" + label + "_scatter.pdf", bbox_inches="tight")
 
     plt.close("all")
+    metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000]
     df = pd.DataFrame({"value": test_data, "metric": test_metric})
-
-    cut = pd.cut(df.value, [0, 20, 50, 100, 200, 300, 500, 1000, 3000],)
+    cut = pd.cut(df.value, metric_binning)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
     counts = df.groupby(cut).agg(["mean", "median", "count"])
     print(counts)
+
+    colors = ["blue", "green"]
+    hue_orders = [["google", "can"], ["google", "can"]]
+
+    if train_metric != None:
+        df2 = pd.DataFrame({"value": test_data, "metric": train_metric})
+        cut = pd.cut(df2.value, metric_binning)
+        boxdf2 = df2.groupby(cut).apply(lambda df2: df2.metric.reset_index(drop=True)).unstack(0)
+        ax = sns.boxplot(data=boxdf2)
+        plt.xticks(rotation=30, fontsize=10)
+        if label == "mae":
+            plt.ylim(0, 500)
+        plt.xlabel(predict_var)
+        plt.ylabel(label)
+        fig = ax.get_figure()
+        output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
+        plt.savefig(output_path + "_google" + label + ".pdf", bbox_inches="tight")
+        plt.close("all")
+
     ax = sns.boxplot(data=boxdf)
+
     plt.xticks(rotation=30, fontsize=10)
     if label == "mae":
         plt.ylim(0, 500)
@@ -1559,9 +1594,23 @@ def smape_array(actual_array, predicted_array):
     return array
 
 
+def mae_array(actual_array, predicted_array):
+    array = []
+    for i, j in zip(actual_array, predicted_array):
+        array.append(abs(i - j))
+    return array
+
+
+def mape_array(actual_array, predicted_array):
+    array = []
+    for i, j in zip(actual_array, predicted_array):
+        array.append(100 * (abs(i - j) / abs(i)))
+    return array
+
+
 def get_error_metrics(data, prediction):
-    mae = tf.keras.losses.MAE(data, prediction)
-    mape = tf.keras.losses.MAPE(data, prediction)
+    mae = mae_array(data, prediction)
+    mape = mape_array(data, prediction)
     smape = smape_array(data, prediction)
     return np.squeeze(mae), np.squeeze(mape), np.squeeze(smape)
 
