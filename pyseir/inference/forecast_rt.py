@@ -536,7 +536,7 @@ class ForecastRt:
         test_forecast_smape = []
         area_test_samples = []
 
-        for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_list):
+        for df, fips, latest_df in zip(area_df_list, area_fips, area_df_list_invalid):
             print("IN LOOP")
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
@@ -565,6 +565,13 @@ class ForecastRt:
                 markersize=5,
                 marker="*",
             )
+            plt.scatter(
+                np.squeeze(dates_test),
+                np.squeeze(forecasts_google),
+                color = 'blue',
+                marker = 'o',
+                label = "Google"
+                )
             plt.scatter(
                 np.squeeze(dates_test),
                 np.squeeze(regression_predictions_test),
