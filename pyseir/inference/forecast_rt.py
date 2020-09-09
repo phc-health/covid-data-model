@@ -270,7 +270,7 @@ class ForecastRt:
                 df = df[:60].copy()
             elif mode == "infer":  # want to keep dates that have incomplete datastreams
                 start_date = self.infer_only_n_days + self.min_number_of_days + 1
-                df = df[-start_date:].copy()
+                df = df[-start_date:-1].copy()
             else:  # otherwise we are training and need to train with complete datastreams
                 df = df[first_valid_index:last_valid_index].copy()
             # dates.append(df.iloc[-self.predict_days:]['sim_day'])
@@ -536,7 +536,6 @@ class ForecastRt:
         area_test_samples = []
 
         for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_invalid_list):
-            print("IN LOOP")
             samples = self.create_samples(df)
             slimmed_samples = slim(samples, self.forecast_variables)
             test_X, test_Y = self.get_scaled_X_Y(slimmed_samples, scalers_dict, "future")
@@ -546,13 +545,9 @@ class ForecastRt:
                 unscaled_forecasts_test,
                 regression_predictions_test,
             ) = self.get_forecasts(samples, test_X, test_Y, scalers_dict, model)
-            print("dates test")
-            print(dates_test)
-            print(forecasts_test)
 
             if self.compare_google:
                 forecasts_google = self.get_google_forecasts(fips, dates_test)
-                print(forecasts_google)
 
             plt.figure(figsize=(18, 12))
             fips = samples[0]["fips"][0]
@@ -1531,59 +1526,56 @@ def align_time_series(series_a, series_b):
         return 0
 
 
-def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
-    plt.close("all")
-    # plt.scatter(
-    #    train_data, train_metric, label="Train", s=2, marker="*",
-    # )
-    plt.scatter(
-        test_data, test_metric, label="Test", s=2, marker="*",
-    )
-    plt.legend()
-    plt.xlabel(predict_var)
-    plt.ylabel(label)
-    output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
-    plt.savefig(output_path + "_" + label + "_scatter.pdf", bbox_inches="tight")
-
+def make_box_plots(df, label, predict_var, dataset_name):
     plt.close("all")
     metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000]
-    df = pd.DataFrame({"value": test_data, "metric": test_metric})
     cut = pd.cut(df.value, metric_binning)
     boxdf = df.groupby(cut).apply(lambda df: df.metric.reset_index(drop=True)).unstack(0)
-    counts = df.groupby(cut).agg(["mean", "median", "count"])
-    print(counts)
-
-    colors = ["blue", "green"]
-    hue_orders = [["google", "can"], ["google", "can"]]
-
-    if train_metric != None:
-        df2 = pd.DataFrame({"value": test_data, "metric": train_metric})
-        cut = pd.cut(df2.value, metric_binning)
-        boxdf2 = df2.groupby(cut).apply(lambda df2: df2.metric.reset_index(drop=True)).unstack(0)
-        ax = sns.boxplot(data=boxdf2)
-        plt.xticks(rotation=30, fontsize=10)
-        if label == "mae":
-            plt.ylim(0, 500)
-        plt.xlabel(predict_var)
-        plt.ylabel(label)
-        fig = ax.get_figure()
-        output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
-        plt.savefig(output_path + "_google" + label + ".pdf", bbox_inches="tight")
-        plt.close("all")
-
-    ax = sns.boxplot(data=boxdf)
-
+    # ax = sns.boxplot(data=boxdf)
+    ax = sns.boxplot(x=df.binned_value, y=df.metric)
     plt.xticks(rotation=30, fontsize=10)
+    plt.title(dataset_name)
     if label == "mae":
         plt.ylim(0, 500)
     plt.xlabel(predict_var)
     plt.ylabel(label)
     fig = ax.get_figure()
     output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
-    plt.savefig(output_path + "_" + label + ".pdf", bbox_inches="tight")
+    plt.savefig(output_path + "_" + label + "-" + dataset_name + ".pdf", bbox_inches="tight")
     ax = sns.swarmplot(data=boxdf, color=".25")
-    plt.savefig(output_path + "_" + label + "_swarm.pdf", bbox_inches="tight")
-    df.to_csv(output_path + "_" + label + "_df.csv")
+    plt.savefig(output_path + "_" + label + "-" + dataset_name + "_swarm.pdf", bbox_inches="tight")
+    plt.close("all")
+    return
+
+
+def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
+    metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000]
+    dataset1_name = "CAN-Forecast"
+    dataset2_name = "Google-Forecast"
+
+    df = pd.DataFrame({"value": test_data, "metric": test_metric}).assign(dataset=dataset1_name)
+    df["binned_value"] = pd.cut(df["value"], metric_binning)
+    print(df.head())
+    make_box_plots(df, label, predict_var, dataset1_name)
+
+    if train_metric != None:
+        df2 = pd.DataFrame({"value": test_data, "metric": train_metric}).assign(
+            dataset=dataset2_name
+        )
+        df2["binned_value"] = pd.cut(df2["value"], metric_binning)
+        make_box_plots(df2, label, predict_var, dataset2_name)
+
+        cdf = pd.concat([df, df2])
+        plt.close("all")
+        ax = sns.boxplot(x=cdf.binned_value, y=cdf.metric, hue=cdf.dataset, data=cdf)
+        plt.xticks(rotation=30, fontsize=10)
+        plt.xlabel(predict_var)
+        plt.ylabel(label)
+        fig = ax.get_figure()
+        output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
+        plt.savefig(output_path + "_" + label + "_COMBINED.pdf", bbox_inches="tight")
+        plt.close("all")
+
     return
 
 
