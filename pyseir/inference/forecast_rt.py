@@ -485,6 +485,21 @@ class ForecastRt:
 
         return
 
+    def get_reich_forecasts(self, fips, dates):
+        df = pd.read_csv(
+            "/Users/natashawoods/Desktop/WORK.nosync/code/covid-data-model/2020-08-24-COVIDhub-ensemble.csv"
+        )
+        df = df[
+            (df["target"] == "1 wk ahead inc case")
+            & (df["type"] == "point")
+            & (df["location"] == fips)
+        ]
+        prediction = df["value"].values / 7
+        prediction_array = []
+        prediction_array.append(prediction)
+        prediction_array.append(prediction)
+        return prediction_array
+
     def get_google_forecasts(self, fips, dates):
         google_df = pd.read_csv(self.google_test_path)
         dates_str = [i.strftime("%Y-%m-%d") for i in dates]
@@ -533,6 +548,9 @@ class ForecastRt:
         test_google_mae = []
         test_google_mape = []
         test_google_smape = []
+        test_reich_mae = []
+        test_reich_mape = []
+        test_reich_smape = []
         area_test_samples = []
 
         for df, fips, latest_df in zip(area_df_list, area_fips, latest_area_df_invalid_list):
@@ -548,6 +566,8 @@ class ForecastRt:
 
             if self.compare_google:
                 forecasts_google = self.get_google_forecasts(fips, dates_test)
+
+            reich_forecast = self.get_reich_forecasts(fips, dates_test)
 
             plt.figure(figsize=(18, 12))
             fips = samples[0]["fips"][0]
@@ -567,6 +587,13 @@ class ForecastRt:
                 color="blue",
                 marker="o",
                 label="Google Forecast",
+            )
+            plt.scatter(
+                np.squeeze(dates_test),
+                np.squeeze(reich_forecast),
+                color="orange",
+                marker="o",
+                label="Reich Ensemble Forecast",
             )
             plt.scatter(
                 np.squeeze(dates_test),
@@ -591,9 +618,6 @@ class ForecastRt:
 
             # Compute metrics
             if compute_metrics:
-                # test_labels = scalers_dict[self.predict_variable].inverse_transform(
-                #    test_Y.reshape(1, -1)
-                # )
                 dates_test = [i.strftime("%Y-%m-%d") for i in dates_test]
                 latest_df["dates"] = latest_df.index.strftime("%Y-%m-%d")
                 test_labels = []
@@ -611,9 +635,14 @@ class ForecastRt:
                     test_labels, forecasts_test
                 )
 
-                # forecast preformance metrics
+                # google preformance metrics
                 mae_test_google, mape_test_google, smape_test_google = get_error_metrics(
                     test_labels, forecasts_google
+                )
+
+                # reich performance metrics
+                mae_test_reich, mape_test_reich, smape_test_reich = get_error_metrics(
+                    test_labels, reich_forecast
                 )
 
                 seq_params_dict = {
@@ -635,39 +664,84 @@ class ForecastRt:
                     )
 
                 # Append metrics to arrays for meta metrics analysis
-                actuals_test.extend(np.squeeze(test_labels))
-                # Linear Predictions
-                test_linear_mae.extend(mae_test_linear)
-                test_linear_mape.extend(mape_test_linear)
-                test_linear_smape.extend(smape_test_linear)
-                # Google Predictions
-                test_google_mae.extend(mae_test_google)
-                test_google_mape.extend(mape_test_google)
-                test_google_smape.extend(smape_test_google)
-                # Forecast Predictions
-                test_forecast_mae.extend(mae_test_forecast)
-                test_forecast_mape.extend(mape_test_forecast)
-                test_forecast_smape.extend(smape_test_forecast)
+                if len(test_labels) > 1:
+                    actuals_test.extend(np.squeeze(test_labels))
+                    # Linear Predictions
+                    test_linear_mae.extend(mae_test_linear)
+                    test_linear_mape.extend(mape_test_linear)
+                    test_linear_smape.extend(smape_test_linear)
+                    # Google Predictions
+                    test_google_mae.extend(mae_test_google)
+                    test_google_mape.extend(mape_test_google)
+                    test_google_smape.extend(smape_test_google)
+                    # Reich Predictions
+                    test_reich_mae.extend(mae_test_reich)
+                    test_reich_mape.extend(mape_test_reich)
+                    test_reich_smape.extend(smape_test_reich)
+                    # Forecast Predictions
+                    test_forecast_mae.extend(mae_test_forecast)
+                    test_forecast_mape.extend(mape_test_forecast)
+                    test_forecast_smape.extend(smape_test_forecast)
+                else:
+                    actuals_test.extend(test_labels)
+                    # Linear Predictions
+                    test_linear_mae.append(mae_test_linear)
+                    test_linear_mape.append(mape_test_linear)
+                    test_linear_smape.append(smape_test_linear)
+                    # Google Predictions
+                    test_google_mae.append(mae_test_google)
+                    test_google_mape.append(mape_test_google)
+                    test_google_smape.append(smape_test_google)
+                    # Reich Predictions
+                    test_reich_mae.append(mae_test_reich)
+                    test_reich_mape.append(mape_test_reich)
+                    test_reich_smape.append(smape_test_reich)
+                    # Forecast Predictions
+                    test_forecast_mae.append(mae_test_forecast)
+                    test_forecast_mape.append(mape_test_forecast)
+                    test_forecast_smape.append(smape_test_forecast)
 
             output_path = get_run_artifact_path(fips, RunArtifact.FORECAST_RESULT)
             state_obj = us.states.lookup(state_name)
             plt.savefig(output_path, bbox_inches="tight")
             plt.close("all")
 
-        plot_percentile_error(
-            None, actuals_test, test_google_mae, test_forecast_mae, "mae", self.predict_variable,
-        )
-        plot_percentile_error(
-            None, actuals_test, test_google_mape, test_forecast_mape, "mape", self.predict_variable,
-        )
-        plot_percentile_error(
-            None,
+        get_percentile_errors(
             actuals_test,
-            test_google_smape,
+            test_forecast_mae,
+            test_google_mae,
+            test_reich_mae,
+            "CAN",
+            "Google",
+            "Reich Ensemble",
+            "mae",
+            self.predict_variable,
+        )
+        get_percentile_errors(
+            actuals_test,
+            test_forecast_mape,
+            test_google_mape,
+            test_reich_mape,
+            "CAN",
+            "Google",
+            "Reich Ensemble",
+            "mape",
+            self.predict_variable,
+        )
+        get_percentile_errors(
+            actuals_test,
             test_forecast_smape,
+            test_google_smape,
+            test_reich_smape,
+            "CAN",
+            "Google",
+            "Reich Ensemble",
             "smape",
             self.predict_variable,
         )
+        # plot_percentile_error(
+        #    None, actuals_test, test_google_mae, test_reich_mae, test_forecast_mae, "mae", self.predict_variable,
+        # )
 
         if self.debug_plots:
             self.plot_variables(
@@ -1157,7 +1231,8 @@ class ForecastRt:
         do_linear = True
 
         i = 0
-        for df, x, y in zip(df_list, X_list, Y_list):
+        # for df, x, y in zip(df_list, X_list, Y_list):
+        for df, x in zip(df_list, X_list):
             i += 1
             if do_linear:
                 n_days = 11  # number of previous datapoints used in linear interpolation
@@ -1548,8 +1623,36 @@ def make_box_plots(df, label, predict_var, dataset_name):
     return
 
 
+def get_df_for_percentile_plots(values, metrics, dataset_name, metric_binning):
+    df = pd.DataFrame({"value": values, "metric": metrics}).assign(dataset=dataset_name)
+    df["binned_value"] = pd.cut(df["value"], metric_binning)
+    return df
+
+
+def get_percentile_errors(
+    values, metrics_1, metrics_2, metrics_3, df1_name, df2_name, df3_name, label, predict_var
+):
+    metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000, 10000]
+    df1 = get_df_for_percentile_plots(values, metrics_1, df1_name, metric_binning)
+    df2 = get_df_for_percentile_plots(values, metrics_2, df2_name, metric_binning)
+    df3 = get_df_for_percentile_plots(values, metrics_3, df3_name, metric_binning)
+    # cdf = pd.concat([df1, df2, df3])
+    cdf = pd.concat([df1, df3])
+    ax = sns.boxplot(x=cdf.binned_value, y=cdf.metric, hue=cdf.dataset, data=cdf)
+    if label == "mae":
+        plt.ylim(0, 500)
+    plt.xticks(rotation=30, fontsize=10)
+    plt.xlabel(predict_var)
+    plt.ylabel(label)
+    fig = ax.get_figure()
+    output_path = get_run_artifact_path("01", RunArtifact.PERCENTILE_PLOT)
+    plt.savefig(output_path + "_" + label + "_COMBINED.pdf", bbox_inches="tight")
+    plt.close("all")
+    print(df1)
+
+
 def plot_percentile_error(train_data, test_data, train_metric, test_metric, label, predict_var):
-    metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000]
+    metric_binning = [0, 20, 50, 100, 200, 300, 500, 1000, 3000, 10000]
     dataset1_name = "CAN-Forecast"
     dataset2_name = "Google-Forecast"
 
@@ -1564,9 +1667,13 @@ def plot_percentile_error(train_data, test_data, train_metric, test_metric, labe
         )
         df2["binned_value"] = pd.cut(df2["value"], metric_binning)
         make_box_plots(df2, label, predict_var, dataset2_name)
-
+        print(df2.head())
         cdf = pd.concat([df, df2])
         plt.close("all")
+        print(cdf.binned_value)
+        print(cdf.metric)
+        print(cdf.dataset)
+        print(cdf.dtypes)
         ax = sns.boxplot(x=cdf.binned_value, y=cdf.metric, hue=cdf.dataset, data=cdf)
         plt.xticks(rotation=30, fontsize=10)
         plt.xlabel(predict_var)
