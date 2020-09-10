@@ -1,5 +1,4 @@
-from io import StringIO
-
+import io
 import structlog
 
 from libs.datasets.combined_datasets import provenance_wide_metrics_to_series
@@ -18,7 +17,7 @@ def test_get_subset_and_get_data():
     # CSV with a unique FIPS value for every region, even countries. In production countries are removed before
     # TimeseriesDataset is created. A future change may replace FIPS with a more general identifier.
     input_df = pd.read_csv(
-        StringIO(
+        io.StringIO(
             "city,county,state,fips,country,aggregate_level,date,metric\n"
             "Smithville,,ZZ,97123,USA,city,2020-03-23,smithville-march23\n"
             "New York City,,ZZ,97324,USA,city,2020-03-22,march22-nyc\n"
@@ -85,3 +84,21 @@ def test_wide_dates():
         ("97222", "m1"): {"value": "src21"},
         ("97222", "m2"): {"value": "src22"},
     }
+
+
+def test_yield_records():
+    data = io.StringIO(
+        "date,fips,cases,contact_tracers\n"
+        "2020-08-17,36,10,10.0\n"
+        "2020-08-18,36,20,20\n"
+        # Should replace pd.nan with nones
+        "2020-08-19,36,,\n"
+    )
+    timeseries = TimeseriesDataset.load_csv(data)
+    expected = [
+        {"fips": "36", "date": pd.Timestamp("2020-08-17"), "cases": 10.0, "contact_tracers": 10.0},
+        {"fips": "36", "date": pd.Timestamp("2020-08-18"), "cases": 20.0, "contact_tracers": 20.0},
+        {"fips": "36", "date": pd.Timestamp("2020-08-19"), "cases": None, "contact_tracers": None},
+    ]
+    records = list(timeseries.yield_records())
+    assert expected == records

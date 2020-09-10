@@ -26,8 +26,9 @@ class DatasetBase(object):
     def yield_records(self) -> Iterable[dict]:
         # It'd be faster to use self.data.itertuples or find a way to avoid yield_records, but that
         # needs larger changes in code calling this.
-        for idx, row in self.data.iterrows():
-            yield row.where(pd.notnull(row), None).to_dict()
+        data = self.data.where(pd.notnull(self.data), None)
+        for idx, row in data.iterrows():
+            yield row.to_dict()
 
     @classmethod
     def load_csv(cls, path_or_buf: Union[pathlib.Path, TextIO]):

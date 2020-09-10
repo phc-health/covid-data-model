@@ -86,7 +86,7 @@ class RegionalCombinedData:
 
     latest: dict
 
-    timeseries: TimeseriesDataset
+    timeseries: timeseries.TimeseriesDataset
 
     @staticmethod
     def from_region(region: Region) -> "RegionalCombinedData":
@@ -100,6 +100,12 @@ class RegionalCombinedData:
         return RegionalCombinedData(
             region=region, latest=region_latest, timeseries=region_timeseries
         )
+
+    def get_us_latest(self):
+        return self.latest
+
+    def get_timeseries(self) -> timeseries.TimeseriesDataset:
+        return self.timeseries
 
     @property
     def population(self) -> int:
