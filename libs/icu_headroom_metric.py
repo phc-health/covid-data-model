@@ -15,20 +15,22 @@ CovidPatientsMethod = can_api_definition.CovidPatientsMethod
 # value in the API.
 DEFAULT_ICU_UTILIZATION = 0.75
 
-DEFAULT_ICU_DECOMP = 0.21
+DEFAULT_ICU_DECOMP = 0  # Switched from 0.21 on 14 Sept 2020 by BrettBoval as CCM tries to update
+# ICU occupancy in real time based on HHS reporting and one-off corrections. The plan is to maintain
+# ground truth upstream via CCM.
 
 ICU_DECOMP_OVERRIDE = {
-    "AL": 0.15,
-    "AZ": 0.4,
-    "DE": 0.3,
-    "DC": 0.15,
-    "GA": 0.1,
-    # TODO(https://trello.com/c/1ddB5ntl/): CCM is currently giving us an
-    # extra-high utilization rate. If that gets fixed we may need to bump this
-    # back down.
-    "MS": 0.37,
-    "NV": 0.25,
-    "RI": 0,
+    # "AL": 0.15,
+    # "AZ": 0.4,
+    # "DE": 0.3,
+    # "DC": 0.15,
+    # "GA": 0.1,
+    # # TODO(https://trello.com/c/1ddB5ntl/): CCM is currently giving us an
+    # # extra-high utilization rate. If that gets fixed we may need to bump this
+    # # back down.
+    # "MS": 0.37,
+    # "NV": 0.25,
+    # "RI": 0,
 }
 
 
