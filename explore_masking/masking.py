@@ -5,9 +5,10 @@ import numpy as np
 from scipy import stats
 
 # import plotly.figure_factory as ff
+# import json
+# from urllib.request import urlopen
+import geopandas
 import json
-from urllib.request import urlopen
-import plotly.express as px
 
 
 # OUTPUT DIR
@@ -17,10 +18,11 @@ OUTPUT_DIR = "output/"
 SMOOTHING_WINDOW_SIZE = 7
 
 # INPUT DATA
-MAP_DATA = "input_data/counties.json"
+MAP_DATA = "input_data/geojson-counties-fips.json"
 CAN_DATA = "input_data/timeseries.csv"
 MASKING_DATA = "input_data/masking_data.csv"
 WEIGHTED_MASKING_DATA = "input_data/w_masking_data.csv"
+FB_SURVEY = "input_data/fb_raw_cli.csv"
 RT_DATA = "input_data/rt_combined_metric.csv"
 
 
@@ -55,9 +57,7 @@ def make_box_plots(df, var1, var2, binning):
     plt.ylabel(var2)
     fig = ax.get_figure()
     # plt.savefig(OUTPUT_DIR + "_" + var1 + "_" + var2 + ".pdf", bbox_inches="tight")
-
     # plt.savefig(OUTPUT_DIR + "_" + var1 + "_" + var2 + "_swarm.pdf", bbox_inches="tight")
-
     plt.savefig(OUTPUT_DIR + "_" + var1 + "_" + var2 + "_violin.pdf", bbox_inches="tight")
     return
 
@@ -68,60 +68,77 @@ def process_raw_df(df):
     return df
 
 
-def make_map_plot(df, var, date):
+def make_map_plot(df, var, date, var_min, var_max):
+    counties = geopandas.read_file(MAP_DATA)
+    counties["fips"] = counties["id"].astype(int)
+    counties_df = pd.DataFrame(counties)
+    counties_df.to_csv("counties.csv")
+
     df = df[df["date"] == date]
-    with urlopen(
-        "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json"
-    ) as response:
-        counties = json.load(response)
-    fig = px.choropleth(
-        df,
-        geojson=counties,
-        locations="fips",
-        color=var,
-        color_continuous_scale="Viridis",
-        range_color=(0, 1000),
-        scope="usa",
-        labels={var: var},
-    )
-    fig.show()
-    fig.save("test.pdf")
-    # fig.write_image(OUTPUT_DIR + "map_" + var + ".pdf")
-    print("MADE")
+    print("UNIQUE VALUES")
+    print(var)
+    print(df["fips"].nunique())
+    print(df["fips"].count())
+    df.to_csv("check.csv")
+    merged_df = pd.merge(df, counties, how="outer", on="fips")
+    merged_df["state"] = merged_df["fips"].astype(str).str[:2]
+    print(merged_df["state"])
+    merged_df.to_csv("merged.csv")
+    merged_df = merged_df[
+        (merged_df["state"] != "15") & (merged_df["state"] != "2") & (merged_df["state"] != "72")
+    ]
+    merged_df.sort_values(by=["state"])
+    merged_df.to_csv("testtest.csv")
+    combined_geo = geopandas.GeoDataFrame(merged_df)
+
+    fig, ax = plt.subplots(1, 1)
+    my_cmap = plt.cm.get_cmap("jet")
+    my_cmap.set_under("grey")
+    my_cmap.set_over("magenta")
+    plt.rc("font", size=40)
+
+    sm = plt.cm.ScalarMappable(cmap=my_cmap, norm=plt.Normalize(vmin=var_min, vmax=var_max))
+    ax = combined_geo.plot(column=var, figsize=(60, 40), cmap=my_cmap, vmin=var_min, vmax=var_max)
+    plt.title(var)
+    plt.axis("off")
+    plt.savefig(OUTPUT_DIR + "map_" + var + ".pdf")
+    plt.close("all")
 
 
 if __name__ == "__main__":
-    # MAKE DATAFRAMES
+    # CAN DATA
     raw_df = pd.read_csv(CAN_DATA)
     raw_df = process_raw_df(raw_df)
     rt_df = pd.read_csv(RT_DATA)
 
+    # MASKING DATA
     raw_masking_df = pd.read_csv(MASKING_DATA)
-    raw_masking_df.rename(columns={"value": "masking_percentage"}, inplace=True)
+    raw_masking_df.rename(
+        columns={"value": "masking_percentage", "time_value": "date", "geo_value": "fips"},
+        inplace=True,
+    )
     weighted_masking_df = pd.read_csv(WEIGHTED_MASKING_DATA)
-    weighted_masking_df.rename(columns={"value": "weighted_masking_percentage"}, inplace=True)
+    weighted_masking_df.rename(
+        columns={"time_value": "date", "geo_value": "fips", "value": "weighted_masking_percentage"},
+        inplace=True,
+    )
+
+    fb_cli_df = pd.read_csv(FB_SURVEY)
+    fb_cli_df.rename(
+        columns={"value": "fb_raw_cli", "time_value": "date", "geo_value": "fips"}, inplace=True
+    )
 
     # MERGE DATAFRAMES
-    can_df = pd.merge(
-        raw_df, rt_df, how="inner", left_on=["fips", "date"], right_on=["fips", "date"]
-    )
-    masking_df = pd.merge(
-        raw_masking_df, weighted_masking_df, how="inner", on=["geo_value", "time_value"]
-    )
-    masking_df = masking_df[masking_df["masking_percentage"] > 80]
-    df = pd.merge(
-        can_df,
-        masking_df,
-        how="inner",
-        left_on=["fips", "date"],
-        right_on=["geo_value", "time_value"],
-    )
+    can_df = pd.merge(raw_df, rt_df, how="inner", on=["fips", "date"])
+    masking_df = pd.merge(raw_masking_df, weighted_masking_df, how="inner", on=["fips", "date"])
+    # masking_df = masking_df[masking_df["masking_percentage"] > 80]
+    df = pd.merge(can_df, masking_df, how="outer", on=["fips", "date"]).fillna(0)
+
     make_scatter_plot(df, "masking_percentage", "new_cases_smooth")
     make_scatter_plot(df, "masking_percentage", "Rt_MAP__new_cases")
     make_scatter_plot(df, "weighted_masking_percentage", "new_cases_smooth")
     make_scatter_plot(df, "weighted_masking_percentage", "Rt_MAP__new_cases")
     make_scatter_plot(df, "masking_percentage", "weighted_masking_percentage")
-    exit()
 
     new_cases_binning = [0, 50, 100, 300, 500, 1000, 3000]
     masking_binning = [60, 65, 70, 75, 80, 85, 90, 95, 100]
@@ -130,12 +147,30 @@ if __name__ == "__main__":
     make_box_plots(df, "masking_percentage", "Rt_MAP__new_cases", masking_binning)
     make_box_plots(df, "weighted_masking_percentage", "new_cases_smooth", masking_binning)
     make_box_plots(df, "weighted_masking_percentage", "Rt_MAP__new_cases", masking_binning)
-    # reg = LinearRegression().fit(np.array(df['masking_percentage']).reshape(-1,1), np.array(df['masking_percentage']).reshape(-1,1) )
-    # reg.score(df['masking_percentage'], df['masking_percentage'])
-    slope, intercept, r_value, p_value, std_err = stats.linregress(
-        df["masking_percentage"], df["new_cases_smooth"]
+
+    # make_map_plot(can_df, "new_cases", "2020-09-15", 0, 3000)
+    make_map_plot(df, "new_cases", "2020-09-15", 0, 3000)
+    # make_map_plot(masking_df, "masking_percentage", "2020-09-15", 80,100)
+    make_map_plot(df, "masking_percentage", "2020-09-15", 80, 100)
+
+
+def obsolete_make_map_plot(df, var, date):
+    df = df[df["date"] == date]
+    # with urlopen(
+    #    "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json"
+    # ) as response:
+    #    counties = json.load(response)
+    fig = px.choropleth(
+        df,
+        geojson=counties,
+        locations="fips",
+        color=var,
+        color_continuous_scale="Viridis",
+        range_color=(0, 3),
+        scope="usa",
+        labels={var: var},
     )
-    print(
-        f"slope: {slope} intercept: {intercept} r_value: {r_value} p_value: {p_value} std_err: {std_err}"
-    )
-    # make_map_plot(df, "sample_size_x", "2020-09-13")
+    fig.show()
+    fig.save("test.pdf")
+    # fig.write_image(OUTPUT_DIR + "map_" + var + ".pdf")
+    print("MADE")
