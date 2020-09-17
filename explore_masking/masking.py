@@ -72,35 +72,35 @@ def make_map_plot(df, var, date, var_min, var_max):
     counties = geopandas.read_file(MAP_DATA)
     counties["fips"] = counties["id"].astype(int)
     counties_df = pd.DataFrame(counties)
-    counties_df.to_csv("counties.csv")
 
     df = df[df["date"] == date]
-    print("UNIQUE VALUES")
-    print(var)
-    print(df["fips"].nunique())
-    print(df["fips"].count())
-    df.to_csv("check.csv")
-    merged_df = pd.merge(df, counties, how="outer", on="fips")
-    merged_df["state"] = merged_df["fips"].astype(str).str[:2]
-    print(merged_df["state"])
-    merged_df.to_csv("merged.csv")
+    n_entries = df["fips"].count()
+    n_unique = df["fips"].nunique()
+    print(f"var: {var} entries: {n_entries} unique entries: {n_unique}")
+    merged_df = pd.merge(df, counties, how="outer", on="fips").fillna(np.NaN)
+    merged_df["test_var"] = -10
+
     merged_df = merged_df[
-        (merged_df["state"] != "15") & (merged_df["state"] != "2") & (merged_df["state"] != "72")
+        (merged_df["STATE"] != "15") & (merged_df["STATE"] != "02") & (merged_df["STATE"] != "72")
     ]
-    merged_df.sort_values(by=["state"])
-    merged_df.to_csv("testtest.csv")
+    merged_df.to_csv("merged.csv")
     combined_geo = geopandas.GeoDataFrame(merged_df)
 
     fig, ax = plt.subplots(1, 1)
     my_cmap = plt.cm.get_cmap("jet")
     my_cmap.set_under("grey")
-    my_cmap.set_over("magenta")
+    # my_cmap.set_over("magenta")
     plt.rc("font", size=40)
 
     sm = plt.cm.ScalarMappable(cmap=my_cmap, norm=plt.Normalize(vmin=var_min, vmax=var_max))
-    ax = combined_geo.plot(column=var, figsize=(60, 40), cmap=my_cmap, vmin=var_min, vmax=var_max)
+    ax = combined_geo.plot(
+        column="test_var", figsize=(60, 40), cmap=my_cmap, vmin=var_min, vmax=var_max
+    )
     plt.title(var)
     plt.axis("off")
+    fig = ax.get_figure()
+    cax = fig.add_axes([0.1, 0.2, 0.8, 0.01])
+    fig.colorbar(sm, orientation="horizontal", aspect=80, label=var, cax=cax, extend="both")
     plt.savefig(OUTPUT_DIR + "map_" + var + ".pdf")
     plt.close("all")
 
@@ -134,6 +134,12 @@ if __name__ == "__main__":
     # masking_df = masking_df[masking_df["masking_percentage"] > 80]
     df = pd.merge(can_df, masking_df, how="outer", on=["fips", "date"]).fillna(0)
 
+    make_map_plot(df, "masking_percentage", "2020-09-16", 0, 100)
+    make_map_plot(fb_cli_df, "fb_raw_cli", "2020-09-16", 0, 5)
+    make_map_plot(can_df, "new_cases", "2020-09-15", 0, 3000)
+
+    exit()
+
     make_scatter_plot(df, "masking_percentage", "new_cases_smooth")
     make_scatter_plot(df, "masking_percentage", "Rt_MAP__new_cases")
     make_scatter_plot(df, "weighted_masking_percentage", "new_cases_smooth")
@@ -147,11 +153,6 @@ if __name__ == "__main__":
     make_box_plots(df, "masking_percentage", "Rt_MAP__new_cases", masking_binning)
     make_box_plots(df, "weighted_masking_percentage", "new_cases_smooth", masking_binning)
     make_box_plots(df, "weighted_masking_percentage", "Rt_MAP__new_cases", masking_binning)
-
-    # make_map_plot(can_df, "new_cases", "2020-09-15", 0, 3000)
-    make_map_plot(df, "new_cases", "2020-09-15", 0, 3000)
-    # make_map_plot(masking_df, "masking_percentage", "2020-09-15", 80,100)
-    make_map_plot(df, "masking_percentage", "2020-09-15", 80, 100)
 
 
 def obsolete_make_map_plot(df, var, date):
