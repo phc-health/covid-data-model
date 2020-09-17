@@ -77,13 +77,21 @@ def make_map_plot(df, var, date, var_min, var_max):
     n_entries = df["fips"].count()
     n_unique = df["fips"].nunique()
     print(f"var: {var} entries: {n_entries} unique entries: {n_unique}")
-    merged_df = pd.merge(df, counties, how="outer", on="fips").fillna(np.NaN)
-    merged_df["test_var"] = -10
+    merged_df = pd.merge(df, counties, how="outer", on="fips")
+    print("MIN")
+    print(merged_df[var].min())
+    plt.hist(merged_df[var])
+    plt.savefig(var + ".pdf")
+    merged_df[var].fillna(-10, inplace=True)
+
+    print(merged_df[var])
+    print(merged_df.dtypes)
+    print("changed")
 
     merged_df = merged_df[
         (merged_df["STATE"] != "15") & (merged_df["STATE"] != "02") & (merged_df["STATE"] != "72")
     ]
-    merged_df.to_csv("merged.csv")
+    merged_df.to_csv("merged.csv", columns=[var])
     combined_geo = geopandas.GeoDataFrame(merged_df)
 
     fig, ax = plt.subplots(1, 1)
@@ -93,9 +101,7 @@ def make_map_plot(df, var, date, var_min, var_max):
     plt.rc("font", size=40)
 
     sm = plt.cm.ScalarMappable(cmap=my_cmap, norm=plt.Normalize(vmin=var_min, vmax=var_max))
-    ax = combined_geo.plot(
-        column="test_var", figsize=(60, 40), cmap=my_cmap, vmin=var_min, vmax=var_max
-    )
+    ax = combined_geo.plot(column=var, figsize=(60, 40), cmap=my_cmap, vmin=var_min, vmax=var_max)
     plt.title(var)
     plt.axis("off")
     fig = ax.get_figure()
@@ -135,6 +141,7 @@ if __name__ == "__main__":
     df = pd.merge(can_df, masking_df, how="outer", on=["fips", "date"]).fillna(0)
 
     make_map_plot(df, "masking_percentage", "2020-09-16", 0, 100)
+    make_map_plot(df, "weighted_masking_percentage", "2020-09-16", 0, 100)
     make_map_plot(fb_cli_df, "fb_raw_cli", "2020-09-16", 0, 5)
     make_map_plot(can_df, "new_cases", "2020-09-15", 0, 3000)
 
