@@ -81,6 +81,9 @@ execute_model() {
   # Go to repo root (where run.sh lives).
   cd "$(dirname "$0")"
 
+  ls /data/
+  du -d1 -h /data/
+  return
   echo ">>> Generating state and county models to ${API_OUTPUT_DIR}"
   # TODO(#148): We need to clean up the output of these scripts!
   pyseir build-all --output-dir="${API_OUTPUT_DIR}" | tee "${API_OUTPUT_DIR}/stdout.log"
