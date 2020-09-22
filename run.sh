@@ -82,7 +82,8 @@ execute_model() {
   cd "$(dirname "$0")"
 
   ls /data/
-  du -d1 -h /data/
+  rm -r /data/api-results-*
+
   return
   echo ">>> Generating state and county models to ${API_OUTPUT_DIR}"
   # TODO(#148): We need to clean up the output of these scripts!
