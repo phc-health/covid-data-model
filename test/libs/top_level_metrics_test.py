@@ -63,7 +63,7 @@ def test_calculate_test_positivity():
     positive_tests = _series_with_date_index([0, 1, 3, 6])
     negative_tests = _series_with_date_index([0, 0, 1, 3])
     positive_rate = top_level_metrics.calculate_test_positivity(
-        positive_tests, negative_tests, smooth=2, lag_lookback=1
+        positive_tests, negative_tests, lag_lookback=1
     )
     expected = _series_with_date_index([np.nan, 1, 0.75, 2 / 3], dtype="float64")
     pd.testing.assert_series_equal(positive_rate, expected)

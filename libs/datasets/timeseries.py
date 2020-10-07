@@ -7,6 +7,8 @@ from typing import Dict
 from typing import Iterable
 from typing import List, Optional, Union, TextIO
 from typing import Sequence
+
+from covidactnow.datapublic.common_fields import FieldName
 from typing_extensions import final
 
 import pandas as pd
@@ -80,7 +82,7 @@ class OneRegionTimeseriesDataset:
 
     @property
     def date_indexed(self) -> pd.DataFrame:
-        return self.data.set_index(CommonFields.DATE)
+        return self.data.set_index(CommonFields.DATE).sort_index()
 
     @property
     def empty(self):
@@ -107,6 +109,9 @@ class OneRegionTimeseriesDataset:
         return OneRegionTimeseriesDataset(
             _remove_padded_nans(self.data, columns), latest=self.latest
         )
+
+    def get_timeseries(self, name: FieldName) -> pd.Series:
+        return self.date_indexed[:, name]
 
 
 class TimeseriesDataset(dataset_base.DatasetBase):

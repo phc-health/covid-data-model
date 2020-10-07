@@ -1,13 +1,19 @@
+from itertools import chain
+from typing import Mapping
 from typing import Optional, Tuple
 import enum
 from datetime import timedelta
+from typing import Sequence
+
 import pandas as pd
 import numpy as np
 from covidactnow.datapublic.common_fields import CommonFields
 from covidactnow.datapublic import common_fields
+from covidactnow.datapublic.common_fields import FieldName
 
 from api import can_api_definition
 from libs import series_utils
+from libs import test_positivity
 from libs.datasets import can_model_output_schema as schema
 from libs.datasets.timeseries import OneRegionTimeseriesDataset
 from libs.datasets.sources.can_pyseir_location_output import CANPyseirLocationOutput
@@ -37,6 +43,69 @@ class MetricsFields(common_fields.ValueAsStrMixin, str, enum.Enum):
     ICU_HEADROOM_RATIO = "icuHeadroomRatio"
 
 
+TEST_POSITIVITY_METHODS = [
+    test_positivity.Method(
+        "positiveCasesViral_totalTestEncountersViral",
+        CommonFields.POSITIVE_CASES_VIRAL,
+        CommonFields.TOTAL_TEST_ENCOUNTERS_VIRAL,
+    ),
+    test_positivity.Method(
+        "positiveTestsViral_totalTestsViral",
+        CommonFields.POSITIVE_TESTS_VIRAL,
+        CommonFields.TOTAL_TESTS_VIRAL,
+    ),
+    test_positivity.Method(
+        "positiveCasesViral_totalTestsViral",
+        CommonFields.POSITIVE_CASES_VIRAL,
+        CommonFields.TOTAL_TESTS_VIRAL,
+    ),
+    test_positivity.Method(
+        "positiveTests_totalTestsViral", CommonFields.POSITIVE_TESTS, CommonFields.TOTAL_TESTS_VIRAL
+    ),
+    test_positivity.Method(
+        "positiveCasesViral_totalTestsPeopleViral",
+        CommonFields.POSITIVE_CASES_VIRAL,
+        CommonFields.TOTAL_TESTS_PEOPLE_VIRAL,
+    ),
+    test_positivity.Method(
+        "positiveCasesViral_totalTestResults",
+        CommonFields.POSITIVE_CASES_VIRAL,
+        CommonFields.TOTAL_TESTS,
+    ),
+]
+
+TEST_POSITIVITY_METRICS = set(
+    chain.from_iterable(
+        (method.numerator, method.denominator) for method in TEST_POSITIVITY_METHODS
+    )
+)
+
+
+def calculate_smoothed_timeseries(
+    timeseries: OneRegionTimeseriesDataset, field_names: Sequence[FieldName]
+) -> pd.DataFrame:
+    smoothed_fields: Mapping[FieldName, pd.Series] = {}
+    for name in field_names:
+        try:
+            ts = timeseries.get_timeseries(name)
+        except KeyError:
+            pass
+        except TypeError:
+            pass
+        else:
+            ts_interpolated = series_utils.interpolate_stalled_and_missing_values(ts)
+            daily_delta = ts_interpolated.diff()
+            smoothed = series_utils.smooth_with_rolling_average(daily_delta)
+            smoothed_fields[name] = smoothed
+    # XXX need to handle rather cammon casef of smoothed_fields being empty.
+    results = pd.concat(smoothed_fields, names=[CommonFields.VARIABLE])
+    start_date = results[CommonFields.DATE].min()
+    end_date = results[CommonFields.DATE].max()
+    input_date_range = pd.date_range(start=start_date, end=end_date)
+    results = results.reindex(columns=input_date_range).rename_axis(columns=CommonFields.DATE)
+    return results
+
+
 def calculate_metrics_for_timeseries(
     timeseries: OneRegionTimeseriesDataset,
     model_output: Optional[CANPyseirLocationOutput],
@@ -48,7 +117,7 @@ def calculate_metrics_for_timeseries(
     fips = latest[CommonFields.FIPS]
     population = latest[CommonFields.POPULATION]
 
-    data = timeseries.data.set_index(CommonFields.DATE)
+    data = timeseries.date_indexed
 
     estimated_current_icu = None
     infection_rate = np.nan
@@ -78,13 +147,18 @@ def calculate_metrics_for_timeseries(
     cumulative_cases = data[CommonFields.CASES]
     case_density = calculate_case_density(cumulative_cases, population)
 
+    smoothed_timeseries_for_postivity = calculate_smoothed_timeseries(
+        timeseries, TEST_POSITIVITY_METRICS
+    )
+    test_positivity.AllMethods.calculate(smoothed_timeseries_for_postivity, TEST_POSITIVITY_METHODS)
+
     cumulative_positive_tests = series_utils.interpolate_stalled_and_missing_values(
         data[CommonFields.POSITIVE_TESTS]
     )
     cumulative_negative_tests = series_utils.interpolate_stalled_and_missing_values(
         data[CommonFields.NEGATIVE_TESTS]
     )
-    test_positivity = calculate_test_positivity(
+    test_positivity_ts = calculate_test_positivity(
         cumulative_positive_tests, cumulative_negative_tests
     )
     contact_tracer_capacity = calculate_contact_tracers(
@@ -101,7 +175,7 @@ def calculate_metrics_for_timeseries(
     top_level_metrics_data = {
         CommonFields.FIPS: fips,
         MetricsFields.CASE_DENSITY_RATIO: case_density,
-        MetricsFields.TEST_POSITIVITY: test_positivity,
+        MetricsFields.TEST_POSITIVITY: test_positivity_ts,
         MetricsFields.CONTACT_TRACER_CAPACITY_RATIO: contact_tracer_capacity,
         MetricsFields.INFECTION_RATE: infection_rate,
         MetricsFields.INFECTION_RATE_CI90: infection_rate_ci90,
@@ -155,7 +229,7 @@ def calculate_case_density(
 
 
 def calculate_test_positivity(
-    positive_tests: pd.Series, negative_tests: pd.Series, smooth: int = 7, lag_lookback: int = 7
+    positive_tests: pd.Series, negative_tests: pd.Series, lag_lookback: int = 7
 ) -> pd.Series:
     """Calculates positive test rate.
 
