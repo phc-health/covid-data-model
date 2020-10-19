@@ -73,6 +73,8 @@ def calculate_metrics_for_timeseries(
     test_positivity = calculate_test_positivity(
         cumulative_positive_tests, cumulative_negative_tests
     )
+    if data[CommonFields.TEST_POSITIVITY].any():
+        test_positivity = data[CommonFields.TEST_POSITIVITY]
     contact_tracer_capacity = calculate_contact_tracers(
         cumulative_cases, data[CommonFields.CONTACT_TRACERS_COUNT]
     )
