@@ -21,7 +21,7 @@ CONTACT_TRACERS_PER_CASE = 5
 RT_TRUNCATION_DAYS = 7
 
 
-MAX_METRIC_LOOKBACK_DAYS = 7
+MAX_METRIC_LOOKBACK_DAYS = 70
 
 
 class MetricsFields(common_fields.ValueAsStrMixin, str, enum.Enum):
@@ -141,7 +141,7 @@ def calculate_case_density(
 
 
 def calculate_test_positivity(
-    positive_tests: pd.Series, negative_tests: pd.Series, smooth: int = 7, lag_lookback: int = 7
+    positive_tests: pd.Series, negative_tests: pd.Series, smooth: int = 7, lag_lookback: int = 100
 ) -> pd.Series:
     """Calculates positive test rate.
 
