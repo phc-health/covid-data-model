@@ -6,7 +6,7 @@ import numpy as np
 
 def smooth_with_rolling_average(
     series: pd.Series,
-    window: int = 7,
+    window: int = 14,
     include_trailing_zeros: bool = True,
     exclude_negatives: bool = True,
 ):

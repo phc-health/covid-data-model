@@ -164,6 +164,14 @@ def calculate_test_positivity(
     if any(last_n_positive) and last_n_negative.isna().all():
         return pd.Series([], dtype="float64")
 
+    def keep_if_wed(row):
+        if row.name.isoweekday() == 3:
+            return row[0]
+        else:
+            return np.nan
+
+    positive_smoothed = pd.DataFrame(positive_smoothed).apply(axis="columns", func=keep_if_wed)
+    negative_smoothed = pd.DataFrame(negative_smoothed).apply(axis="columns", func=keep_if_wed)
     return positive_smoothed / (negative_smoothed + positive_smoothed)
 
 
