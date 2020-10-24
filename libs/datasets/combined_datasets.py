@@ -69,8 +69,8 @@ FeatureDataSourceMap = NewType(
 ALL_TIMESERIES_FEATURE_DEFINITION: FeatureDataSourceMap = {
     CommonFields.CASES: [NYTimesDataset],
     CommonFields.CONTACT_TRACERS_COUNT: [TestAndTraceData],
-    CommonFields.CUMULATIVE_HOSPITALIZED: [CDSDataset, CovidTrackingDataSource],
-    CommonFields.CUMULATIVE_ICU: [CDSDataset, CovidTrackingDataSource],
+    CommonFields.CUMULATIVE_HOSPITALIZED: [CovidTrackingDataSource],
+    CommonFields.CUMULATIVE_ICU: [CovidTrackingDataSource],
     CommonFields.CURRENT_HOSPITALIZED: [
         CovidCountyDataDataSource,
         CovidTrackingDataSource,
@@ -87,13 +87,11 @@ ALL_TIMESERIES_FEATURE_DEFINITION: FeatureDataSourceMap = {
     CommonFields.HOSPITAL_BEDS_IN_USE_ANY: [CovidCountyDataDataSource],
     CommonFields.ICU_BEDS: [CovidCountyDataDataSource],
     CommonFields.NEGATIVE_TESTS: [
-        CDSDataset,
         CovidCountyDataDataSource,
         CovidTrackingDataSource,
         HHSTestingDataset,
     ],
     CommonFields.POSITIVE_TESTS: [
-        CDSDataset,
         CovidCountyDataDataSource,
         CovidTrackingDataSource,
         HHSTestingDataset,

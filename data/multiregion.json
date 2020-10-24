@@ -2,14 +2,14 @@
   "dataset_type": "multiregion",
   "path": "data/multiregion.csv",
   "data_git_info": {
-    "sha": "6c1cb1c8f9be7d8907c2a625e703cbefa3b5f4f2",
-    "branch": "mikelehen/test-cms-data",
+    "sha": "0cab2341306b6a3a1c1057a76a4d52488030a841",
+    "branch": "mikelehen/test-cms-data-2",
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "dc049981d1e66ac4a3092d993174c72209b5171d",
-    "branch": "mikelehen/use-cms-test-positivity",
+    "sha": "a2c13696ecfba19c424ab1ad9c64a9ec08afac17",
+    "branch": "mikelehen/test-cms-data-baseline-2",
     "is_dirty": true
   },
-  "updated_at": "2020-10-19T02:36:16.953745"
+  "updated_at": "2020-10-24T01:57:03.375750"
 }
