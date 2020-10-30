@@ -72,9 +72,9 @@ class CovidCountyDataDataSource(data_source.DataSource):
 
         # Make a copy to avoid modifying the argument when using mask with inplace=True.
         df = data.copy()
-        tests_and_cases = df.eval(
-            "negative_tests.isna() & positive_tests.isna() & total_tests.notna() & cases.notna()"
-        )
+        # tests_and_cases = df.eval(
+        #    "negative_tests.isna() & positive_tests.isna() & total_tests.notna() & cases.notna()"
+        # )
         missing_neg = df.eval(
             "negative_tests.isna() & positive_tests.notna() & total_tests.notna() & cases.notna()"
         )
@@ -89,16 +89,16 @@ class CovidCountyDataDataSource(data_source.DataSource):
         provenance[CommonFields.NEGATIVE_TESTS] = "none"
 
         # Using where/mask is suggested by https://stackoverflow.com/a/36067403/341400
-        df[CommonFields.POSITIVE_TESTS].mask(tests_and_cases, df[CommonFields.CASES], inplace=True)
-        df[CommonFields.NEGATIVE_TESTS].mask(
-            tests_and_cases, df[CommonFields.TOTAL_TESTS] - df[CommonFields.CASES], inplace=True
-        )
-        provenance[CommonFields.POSITIVE_TESTS].mask(
-            tests_and_cases, "tests_and_cases", inplace=True
-        )
-        provenance[CommonFields.NEGATIVE_TESTS].mask(
-            tests_and_cases, "tests_and_cases", inplace=True
-        )
+        # df[CommonFields.POSITIVE_TESTS].mask(tests_and_cases, df[CommonFields.CASES], inplace=True)
+        # df[CommonFields.NEGATIVE_TESTS].mask(
+        #    tests_and_cases, df[CommonFields.TOTAL_TESTS] - df[CommonFields.CASES], inplace=True
+        # )
+        # provenance[CommonFields.POSITIVE_TESTS].mask(
+        #    tests_and_cases, "tests_and_cases", inplace=True
+        # )
+        # provenance[CommonFields.NEGATIVE_TESTS].mask(
+        #    tests_and_cases, "tests_and_cases", inplace=True
+        # )
 
         df[CommonFields.NEGATIVE_TESTS].mask(
             missing_neg,

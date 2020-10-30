@@ -7,9 +7,9 @@
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "7614e4aa9794b2518f8f0c52991ced1b54ca40d5",
-    "branch": "master",
-    "is_dirty": false
+    "sha": "14f9bc4cc3ed5b126b86c82069a173b391a5db13",
+    "branch": "mikelehen/no-cases",
+    "is_dirty": true
   },
-  "updated_at": "2020-10-30T12:00:14.492930"
+  "updated_at": "2020-10-30T18:18:01.126270"
 }
