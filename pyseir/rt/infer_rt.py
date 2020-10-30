@@ -22,6 +22,30 @@ from pyseir.rt import plotting, utils
 rt_log = structlog.get_logger(__name__)
 
 
+from numba import njit, vectorize, float64
+from math import exp, sqrt, pi
+
+SQRT2PI = sqrt(2.0 * pi)
+
+
+@vectorize([float64(float64, float64, float64)], fastmath=True)
+def normal_pdf(x, mean=0, std_deviation=1):
+    u = (x - mean) / std_deviation
+    return exp(-0.5 * u ** 2) / (SQRT2PI * std_deviation)
+
+
+@njit(fastmath=True, parallel=True)
+def pdf_vector(scale):
+    x = np.linspace(0, 10, 501).astype(np.float64)
+    y = np.linspace(0, 10, 501).astype(np.float64)
+    array = np.empty((501, 501))
+    for i, a in enumerate(x):
+        for j, b in enumerate(y):
+            array[i, j] = normal_pdf(a, b, scale)
+
+    return array
+
+
 @dataclass(frozen=True)
 class RegionalInput:
     region: pipeline.Region
@@ -275,9 +299,8 @@ class RtInferenceEngine:
             b = max(1.0, math.sqrt(self.scale_sigma_from_count / timeseries_scale))
 
         use_sigma = min(a, b) * self.default_process_sigma
-
-        process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
-
+        process_matrix = pdf_vector(use_sigma)
+        # process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
         # process_matrix applies gaussian smoothing to the previous posterior to make the prior.
         # But when the gaussian is wide much of its distribution function can be outside of the
         # range Reff = (0,10). When this happens the smoothing is not symmetric in R space. For
