@@ -34,7 +34,7 @@ def normal_pdf(x, mean=0, std_deviation=1):
     return exp(-0.5 * u ** 2) / (SQRT2PI * std_deviation)
 
 
-@njit(fastmath=True, parallel=True)
+@njit(fastmath=True)
 def pdf_vector(scale):
     x = np.linspace(0, 10, 501).astype(np.float64)
     y = np.linspace(0, 10, 501).astype(np.float64)
