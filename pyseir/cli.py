@@ -76,16 +76,20 @@ class StatePipeline:
         assert region.is_state()
         start = time.time()
         infer_rt_input = infer_rt.RegionalInput.from_region(region)
+        root.info("Infer Rt input", time=time.time() - start, region=region)
         infer_df = infer_rt.run_rt(infer_rt_input)
+        root.info("Infer Rt run", time=time.time() - start, region=region)
 
         # Run ICU adjustment
         icu_input = infer_icu.RegionalInput.from_regional_data(
             combined_datasets.RegionalData.from_region(region)
         )
+        root.info("ICU input", time=time.time() - start, region=region)
         icu_data = infer_icu.get_icu_timeseries_from_regional_input(
             icu_input, weight_by=infer_icu.ICUWeightsPath.ONE_MONTH_TRAILING_CASES
         )
-        root.info("Infer Rt runtime", time=time.time() - start)
+        root.info("ICU data", time=time.time() - start, region=region)
+        root.info("Infer Rt runtime", time=time.time() - start, region=region)
         return StatePipeline(region=region, infer_df=infer_df, icu_data=icu_data)
 
 
