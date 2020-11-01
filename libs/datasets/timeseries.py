@@ -108,8 +108,10 @@ class OneRegionTimeseriesDataset:
         # Copied from dataset_base.py
         # It'd be faster to use self.data.itertuples or find a way to avoid yield_records, but that
         # needs larger changes in code calling this.
-        for idx, row in self.data.iterrows():
-            yield row.where(pd.notnull(row), None).to_dict()
+        data = self.data.copy()
+        data = data.where(pd.notnull(data), None)
+        for idx, row in data.iterrows():
+            yield row.to_dict()
 
     def get_subset(self, after=None, columns=tuple()):
         rows_key = dataset_utils.make_rows_key(self.data, after=after,)
