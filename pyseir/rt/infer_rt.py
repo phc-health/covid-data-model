@@ -419,8 +419,8 @@ class RtInferenceEngine:
 
         # Setup monitoring for Reff lagging signal in daily likelihood
         monitor = utils.LagMonitor(debug=False)  # Set debug=True for detailed printout of daily lag
-        start = time.time()
-
+        monitor_time = 0.0
+        pm_time = 0.0
         # (5) Iteratively apply Bayes' rule
         loop_idx = 0
         for previous_day, current_day in zip(timeseries.index[:-1], timeseries.index[1:]):
@@ -429,8 +429,9 @@ class RtInferenceEngine:
             scale = 0.9 * scale + 0.1 * timeseries[current_day]
 
             # Calculate process matrix for each day
+            start = time.time()
             (current_sigma, process_matrix) = self.make_process_matrix(scale)
-
+            pm_time += time.time() - start
             # (5a) Calculate the new prior
             current_prior = process_matrix @ posteriors[previous_day]
 
@@ -460,6 +461,7 @@ class RtInferenceEngine:
 
             # Monitors if posterior is lagging excessively behind signal in likelihood
             # TODO future can return cumulative lag and use to scale sigma up only when needed
+            start = time.time()
             monitor.evaluate_lag_using_argmaxes(
                 current_day=loop_idx,
                 current_sigma=current_sigma,
@@ -468,12 +470,14 @@ class RtInferenceEngine:
                 like_am=likelihoods[current_day].argmax(),
                 post_am=numerator.argmax(),
             )
+            monitor_time += time.time() - start
 
             # Add to the running sum of log likelihoods
             log_likelihood += np.log(denominator)
             loop_idx += 1
 
-        rt_log.info("[TIMING] looop", time=time.time() - start)
+        rt_log.info("[TIMING] Process matrix", time=pm_time)
+        rt_log.info("[TIMING] Monitor", time=monitor_time)
 
         self.log_likelihood = log_likelihood
 
