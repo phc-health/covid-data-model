@@ -83,7 +83,7 @@ execute_model() {
 
   echo ">>> Generating state and county models to ${API_OUTPUT_DIR}"
   # TODO(#148): We need to clean up the output of these scripts!
-  py-spy record -o "${API_OUTPUT_DIR}/profile.svg" --subprocesses -- pyseir build-all --output-dir="${API_OUTPUT_DIR}" --states-only --states MA | tee "${API_OUTPUT_DIR}/stdout.log"
+  py-spy record -o "${API_OUTPUT_DIR}/profile.svg" --subprocesses --native -- pyseir build-all --output-dir="${API_OUTPUT_DIR}" --states-only --states MA --states NY --states MO --states TX | tee "${API_OUTPUT_DIR}/stdout.log"
 
   # Move state output to the expected location.
   mkdir -p ${API_OUTPUT_DIR}/

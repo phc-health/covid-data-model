@@ -1,6 +1,6 @@
 name: Python Unit Tests
 
-on: [push]
+on: []
 
 jobs:
   code-formatting-linting:
