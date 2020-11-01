@@ -30,7 +30,7 @@ SeriesOrDataFrame = TypeVar("SeriesOrDataFrame", pd.Series, pd.DataFrame)
 
 def parallel_map(func: Callable[[T], R], iterable: Iterable[T]) -> Iterable[R]:
     """Runs func on each item in iterable, in parallel if possible."""
-    if USE_MULTIPROCESSING and False:
+    if USE_MULTIPROCESSING:
         # Setting maxtasksperchild to one ensures that we minimize memory usage over time by creating
         # a new child for every task. Addresses OOMs we saw on highly parallel build machine.
         with multiprocessing.Pool(4, maxtasksperchild=1) as pool:

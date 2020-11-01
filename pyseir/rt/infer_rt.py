@@ -1,5 +1,6 @@
 from typing import Optional
 import math
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 import structlog
@@ -82,11 +83,13 @@ def run_rt(
     """
 
     # Generate the Data Packet to Pass to RtInferenceEngine
+    start = time.time()
     smoothed_cases = _generate_input_data(
         regional_input=regional_input,
         include_testing_correction=include_testing_correction,
         figure_collector=figure_collector,
     )
+    rt_log.info("Generate input data", time.time() - start)
     if smoothed_cases is None:
         rt_log.warning(
             event="Infer Rt Skipped. No Data Passed Filter Requirements:",
@@ -101,7 +104,9 @@ def run_rt(
     )
 
     # Generate the output DataFrame (consider renaming the function infer_all to be clearer)
+    start = time.time()
     output_df = engine.infer_all()
+    rt_log.info("infer all", time.time() - start)
 
     return output_df
 
