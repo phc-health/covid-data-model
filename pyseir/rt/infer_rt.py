@@ -83,13 +83,11 @@ def run_rt(
     """
 
     # Generate the Data Packet to Pass to RtInferenceEngine
-    start = time.time()
     smoothed_cases = _generate_input_data(
         regional_input=regional_input,
         include_testing_correction=include_testing_correction,
         figure_collector=figure_collector,
     )
-    rt_log.info("Generate input data", time.time() - start)
     if smoothed_cases is None:
         rt_log.warning(
             event="Infer Rt Skipped. No Data Passed Filter Requirements:",
@@ -104,9 +102,7 @@ def run_rt(
     )
 
     # Generate the output DataFrame (consider renaming the function infer_all to be clearer)
-    start = time.time()
     output_df = engine.infer_all()
-    rt_log.info("infer all", time.time() - start)
 
     return output_df
 
@@ -501,7 +497,7 @@ class RtInferenceEngine:
             Columns containing MAP estimates and confidence intervals.
         """
         df_all = None
-
+        start = time.time()
         df = pd.DataFrame()
         try:
             dates, posteriors, start_idx = self.get_posteriors(self.dates, self.cases)
@@ -510,7 +506,7 @@ class RtInferenceEngine:
                 event="Posterior Calculation Error", region=self.regional_input.display_name,
             )
             raise e
-
+        rt_log.info("[TIMING]: self.get_posteriors", time=time.time() - start)
         # Note that it is possible for the dates to be missing days
         # This can cause problems when:
         #   1) computing posteriors that assume continuous data (above),
@@ -574,6 +570,7 @@ class RtInferenceEngine:
                 / np.power(suppression, self.tail_suppression_correction / 2)
             ).apply(lambda v: max(v, self.min_conf_width)) + df_all["Rt_MAP_composite"]
 
+        rt_log.info("[TIMING]: after smoothing", time=time.time() - start)
         if plot:
             fig = plotting.plot_rt(df=df_all, display_name=self.display_name)
             if self.figure_collector is None:
@@ -583,6 +580,7 @@ class RtInferenceEngine:
                 fig.savefig(output_path, bbox_inches="tight")
             else:
                 self.figure_collector["3_Rt_inference"] = fig
+        rt_log.info("[TIMING]: after plotting", time=time.time() - start)
         if df_all.empty:
             self.log.warning("Inference not possible")
         else:
