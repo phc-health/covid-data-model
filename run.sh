@@ -84,7 +84,7 @@ execute_model() {
   echo ">>> Generating state and county models to ${API_OUTPUT_DIR}"
   # TODO(#148): We need to clean up the output of these scripts!
   # py-spy record -o "${API_OUTPUT_DIR}/profile.svg" --gil --subprocesses --native -- pyseir build-all --output-dir="${API_OUTPUT_DIR}" --states-only --states MA --states NY --states MO --states TX | tee "${API_OUTPUT_DIR}/stdout.log"
-  OPENBLAS_NUM_THREADS=1 pyseir build-all --output-dir="${API_OUTPUT_DIR}" | tee "${API_OUTPUT_DIR}/stdout.log"
+  OPENBLAS_NUM_THREADS=1 NUMEXPR_MAX_THREADS=1 pyseir build-all --output-dir="${API_OUTPUT_DIR}" | tee "${API_OUTPUT_DIR}/stdout.log"
 
   # Move state output to the expected location.
   mkdir -p ${API_OUTPUT_DIR}/
@@ -129,7 +129,7 @@ execute_api_v2() {
   generate_version_json "${API_OUTPUT_V2}"
 
   echo ">>> Generating API Output"
-  OPENBLAS_NUM_THREADS=1 ./run.py api generate-api-v2 "${API_OUTPUT_DIR}" -o "${API_OUTPUT_V2}"
+  OPENBLAS_NUM_THREADS=1 NUMEXPR_MAX_THREADS=1 ./run.py api generate-api-v2 "${API_OUTPUT_DIR}" -o "${API_OUTPUT_V2}"
 
   echo ">>> All API Artifacts written to ${API_OUTPUT_V2}"
 }
