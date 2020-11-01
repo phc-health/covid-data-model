@@ -74,6 +74,7 @@ class StatePipeline:
     @staticmethod
     def run(region: pipeline.Region) -> "StatePipeline":
         assert region.is_state()
+        start_0 = time.time()
         infer_rt_input = infer_rt.RegionalInput.from_region(region)
         infer_df = infer_rt.run_rt(infer_rt_input)
 
@@ -84,6 +85,7 @@ class StatePipeline:
         icu_data = infer_icu.get_icu_timeseries_from_regional_input(
             icu_input, weight_by=infer_icu.ICUWeightsPath.ONE_MONTH_TRAILING_CASES
         )
+        root.info("Pipeline runtime", time=time.time() - start_0, region=region)
         return StatePipeline(region=region, infer_df=infer_df, icu_data=icu_data)
 
 

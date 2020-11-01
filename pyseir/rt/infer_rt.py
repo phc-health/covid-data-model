@@ -35,7 +35,7 @@ def normal_pdf(x, mean=0, std_deviation=1):
     return exp(-0.5 * u ** 2) / (SQRT2PI * std_deviation)
 
 
-@njit(fastmath=True, parallel=True)
+@njit(fastmath=True)
 def pdf_vector(scale):
     x = np.linspace(0, 10, 501).astype(np.float64)
     y = np.linspace(0, 10, 501).astype(np.float64)
@@ -300,8 +300,8 @@ class RtInferenceEngine:
             b = max(1.0, math.sqrt(self.scale_sigma_from_count / timeseries_scale))
 
         use_sigma = min(a, b) * self.default_process_sigma
-        # process_matrix = pdf_vector(use_sigma)
-        process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
+        process_matrix = pdf_vector(use_sigma)
+        # process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
         # process_matrix applies gaussian smoothing to the previous posterior to make the prior.
         # But when the gaussian is wide much of its distribution function can be outside of the
         # range Reff = (0,10). When this happens the smoothing is not symmetric in R space. For
@@ -419,8 +419,6 @@ class RtInferenceEngine:
 
         # Setup monitoring for Reff lagging signal in daily likelihood
         monitor = utils.LagMonitor(debug=False)  # Set debug=True for detailed printout of daily lag
-        monitor_time = 0.0
-        pm_time = 0.0
         # (5) Iteratively apply Bayes' rule
         loop_idx = 0
         for previous_day, current_day in zip(timeseries.index[:-1], timeseries.index[1:]):
@@ -429,9 +427,7 @@ class RtInferenceEngine:
             scale = 0.9 * scale + 0.1 * timeseries[current_day]
 
             # Calculate process matrix for each day
-            start = time.time()
             (current_sigma, process_matrix) = self.make_process_matrix(scale)
-            pm_time += time.time() - start
             # (5a) Calculate the new prior
             current_prior = process_matrix @ posteriors[previous_day]
 
@@ -461,7 +457,6 @@ class RtInferenceEngine:
 
             # Monitors if posterior is lagging excessively behind signal in likelihood
             # TODO future can return cumulative lag and use to scale sigma up only when needed
-            start = time.time()
             monitor.evaluate_lag_using_argmaxes(
                 current_day=loop_idx,
                 current_sigma=current_sigma,
@@ -470,14 +465,10 @@ class RtInferenceEngine:
                 like_am=likelihoods[current_day].argmax(),
                 post_am=numerator.argmax(),
             )
-            monitor_time += time.time() - start
 
             # Add to the running sum of log likelihoods
             log_likelihood += np.log(denominator)
             loop_idx += 1
-
-        rt_log.info("[TIMING] Process matrix", time=pm_time)
-        rt_log.info("[TIMING] Monitor", time=monitor_time)
 
         self.log_likelihood = log_likelihood
 
