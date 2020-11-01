@@ -1,5 +1,6 @@
 from typing import Optional, List, Union
 import dataclasses
+import time
 import pathlib
 import sys
 import os
@@ -72,6 +73,7 @@ class StatePipeline:
     @staticmethod
     def run(region: pipeline.Region) -> "StatePipeline":
         assert region.is_state()
+        start = time.time()
         infer_rt_input = infer_rt.RegionalInput.from_region(region)
         infer_df = infer_rt.run_rt(infer_rt_input)
 
@@ -82,7 +84,7 @@ class StatePipeline:
         icu_data = infer_icu.get_icu_timeseries_from_regional_input(
             icu_input, weight_by=infer_icu.ICUWeightsPath.ONE_MONTH_TRAILING_CASES
         )
-
+        root.info("Infer Rt runtime", time=time.time() - start)
         return StatePipeline(region=region, infer_df=infer_df, icu_data=icu_data)
 
 
