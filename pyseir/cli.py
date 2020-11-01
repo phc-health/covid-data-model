@@ -72,7 +72,8 @@ class StatePipeline:
     @staticmethod
     def run(region: pipeline.Region) -> "StatePipeline":
         assert region.is_state()
-        infer_df = infer_rt.run_rt(infer_rt.RegionalInput.from_region(region))
+        infer_rt_input = infer_rt.RegionalInput.from_region(region)
+        infer_df = infer_rt.run_rt(infer_rt_input)
 
         # Run ICU adjustment
         icu_input = infer_icu.RegionalInput.from_regional_data(
