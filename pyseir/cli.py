@@ -90,32 +90,28 @@ class StatePipeline:
 
 
 def _get_input(region):
-    return SubStateRegionPipelineInput(
+    return RegionPipelineInput(
         region=region, regional_combined_dataset=combined_datasets.RegionalData.from_region(region),
     )
 
 
 @dataclass
-class SubStateRegionPipelineInput:
+class RegionPipelineInput:
     region: pipeline.Region
     regional_combined_dataset: combined_datasets.RegionalData
 
     @staticmethod
     def build_all(
-        fips: Optional[str] = None, states: Optional[List[str]] = None,
-    ) -> List["SubStateRegionPipelineInput"]:
+        fips: Optional[str] = None,
+        states: Optional[List[str]] = None,
+        level: AggregationLevel = None,
+    ) -> List["RegionPipelineInput"]:
         """For each region smaller than a state, build the input object used to run the pipeline."""
-        # TODO(tom): Pass in the combined dataset instead of reading it from a global location.
-        if fips:  # A single Fips string was passed as a flag. Just run for that fips.
-            regions = {pipeline.Region.from_fips(fips)}
-        else:  # Default to all counties
-            regions = {
-                *combined_datasets.get_subset_regions(
-                    aggregation_level=AggregationLevel.COUNTY,
-                    exclude_county_999=True,
-                    states=states,
-                )
-            }
+        regions = {
+            *combined_datasets.get_subset_regions(
+                aggregation_level=level, exclude_county_999=True, states=states, fips=None
+            )
+        }
         pipeline_inputs = parallel_utils.parallel_map(_get_input, regions)
         return pipeline_inputs
 
@@ -130,8 +126,7 @@ class SubStatePipeline:
     _combined_data: combined_datasets.RegionalData
 
     @staticmethod
-    def run(input: SubStateRegionPipelineInput) -> "SubStatePipeline":
-        assert not input.region.is_state()
+    def run(input: RegionPipelineInput) -> "SubStatePipeline":
         # `infer_df` does not have the NEW_ORLEANS patch applied. TODO(tom): Rename to something like
         # infection_rate.
         infer_rt_input = infer_rt.RegionalInput.from_region(input.region)
@@ -235,23 +230,18 @@ def _build_all_for_states(
     # prepare data
     _cache_global_datasets()
 
-    # do everything for just states in parallel
-    states_regions = [pipeline.Region.from_state(s) for s in states]
-    state_pipelines: List[StatePipeline] = list(
-        parallel_utils.parallel_map(StatePipeline.run, states_regions)
-    )
-
+    level = None
     if states_only:
-        return state_pipelines
+        level = AggregationLevel.STATE
 
-    substate_inputs = SubStateRegionPipelineInput.build_all(fips=fips, states=states)
+    substate_inputs = RegionPipelineInput.build_all(fips=fips, states=states)
 
-    root.info(f"executing pipeline for {len(substate_inputs)} counties")
+    root.info(f"executing pipeline for {len(substate_inputs)} regions")
     substate_pipelines = parallel_utils.parallel_map(SubStatePipeline.run, substate_inputs)
 
     substate_pipelines = _patch_substatepipeline_nola_infection_rate(substate_pipelines)
 
-    return state_pipelines + substate_pipelines
+    return substate_pipelines
 
 
 @entry_point.command()
