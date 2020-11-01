@@ -300,8 +300,8 @@ class RtInferenceEngine:
             b = max(1.0, math.sqrt(self.scale_sigma_from_count / timeseries_scale))
 
         use_sigma = min(a, b) * self.default_process_sigma
-        # process_matrix = pdf_vector(use_sigma)
-        process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
+        process_matrix = pdf_vector(use_sigma)
+        # process_matrix = sps.norm(loc=self.r_list, scale=use_sigma).pdf(self.r_list[:, None])
         # process_matrix applies gaussian smoothing to the previous posterior to make the prior.
         # But when the gaussian is wide much of its distribution function can be outside of the
         # range Reff = (0,10). When this happens the smoothing is not symmetric in R space. For
