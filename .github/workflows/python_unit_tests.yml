@@ -1,6 +1,8 @@
 name: Python Unit Tests
 
-on: []
+on:
+  repository_dispatch:
+    types: booo
 
 jobs:
   code-formatting-linting:
