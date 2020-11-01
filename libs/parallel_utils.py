@@ -33,7 +33,7 @@ def parallel_map(func: Callable[[T], R], iterable: Iterable[T]) -> Iterable[R]:
     if USE_MULTIPROCESSING:
         # Setting maxtasksperchild to one ensures that we minimize memory usage over time by creating
         # a new child for every task. Addresses OOMs we saw on highly parallel build machine.
-        with multiprocessing.Pool(maxtasksperchild=1) as pool:
+        with multiprocessing.Pool(4, maxtasksperchild=1) as pool:
             return pool.map(func, iterable)
     else:
         return map(func, iterable)

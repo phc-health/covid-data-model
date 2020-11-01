@@ -6,6 +6,7 @@ import sys
 import os
 from dataclasses import dataclass
 import logging
+import structlog
 
 import us
 import pandas as pd
@@ -30,7 +31,7 @@ from pyseir.rt.utils import NEW_ORLEANS_FIPS
 
 sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))
 
-root = logging.getLogger()
+root = structlog.getLogger()
 
 DEFAULT_RUN_MODE = "can-inference-derived"
 ALL_STATES: List[str] = [state_obj.abbr for state_obj in us.STATES] + ["PR"]
