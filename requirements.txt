@@ -50,4 +50,4 @@ xlrd==1.2.0  # For panda's read_excel method
 # to binder/requirements.txt, uncomment the following line.
 # -e git://github.com/covid-projections/covid-data-public.git#egg=covidactnow
 
-py-spy==0.3.3
+py-spy==0.4.0.dev1
