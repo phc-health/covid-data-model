@@ -106,10 +106,10 @@ execute_api() {
 
   echo ">>> Generating API for states to ${API_OUTPUT_STATES}/{STATE_ABBREV}.{INTERVENTION}.json"
   mkdir -p "${API_OUTPUT_STATES}"
-  ./run.py api generate-api  -i "${API_OUTPUT_DIR}" -o "${API_OUTPUT_STATES}" --summary-output "${API_OUTPUT_US}" -l state
+  OPENBLAS_NUM_THREADS=1 ./run.py api generate-api  -i "${API_OUTPUT_DIR}" -o "${API_OUTPUT_STATES}" --summary-output "${API_OUTPUT_US}" -l state
 
   echo ">>> Generating API for counties to ${API_OUTPUT_COUNTIES}/{FIPS}.{INTERVENTION}.json"
-  ./run.py api generate-api  -i "${API_OUTPUT_DIR}" -o "${API_OUTPUT_COUNTIES}" --summary-output "${API_OUTPUT_US}" -l county
+  OPENBLAS_NUM_THREADS=1 ./run.py api generate-api  -i "${API_OUTPUT_DIR}" -o "${API_OUTPUT_COUNTIES}" --summary-output "${API_OUTPUT_US}" -l county
 
   # echo ">>> Generate an QA doc for states to ${API_OUTPUT_DIR}/qa"
   # ./run.py compare-snapshots -i "${API_OUTPUT_STATES}" -o "${API_OUTPUT_DIR}/qa"
