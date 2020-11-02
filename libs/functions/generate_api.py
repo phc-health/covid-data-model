@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Optional
+import itertools
+from typing import Optional, List
 
 from api.can_api_definition import (
     Actuals,
@@ -12,6 +13,7 @@ from api.can_api_definition import (
     RegionSummaryWithTimeseries,
 )
 from covidactnow.datapublic.common_fields import CommonFields
+from libs import parallel_utils
 from libs import us_state_abbrev
 from libs.datasets.timeseries import OneRegionTimeseriesDataset
 from libs.enums import Intervention
@@ -117,29 +119,32 @@ def generate_region_timeseries(
     )
 
 
+def _build_prediction_rows(region_timeseries) -> List[PredictionTimeseriesRowWithHeader]:
+    # Iterate through each state or county in data, adding summary data to each
+    # timeseries row.
+    summary_data = {
+        "countryName": region_timeseries.countryName,
+        "countyName": region_timeseries.countyName,
+        "stateName": region_timeseries.stateName,
+        "fips": region_timeseries.fips,
+        "lat": region_timeseries.lat,
+        "long": region_timeseries.long,
+        "intervention": region_timeseries.intervention.name,
+        # TODO(chris): change this to reflect latest time data updated?
+        "lastUpdatedDate": datetime.utcnow(),
+    }
+
+    rows = []
+    for timeseries_data in region_timeseries.timeseries:
+        timeseries_row = PredictionTimeseriesRowWithHeader(**summary_data, **timeseries_data.dict())
+        rows.append(timeseries_row)
+
+    return rows
+
+
 def generate_bulk_flattened_timeseries(
     bulk_timeseries: AggregateRegionSummary,
 ) -> AggregateFlattenedTimeseries:
-    rows = []
-    for region_timeseries in bulk_timeseries.__root__:
-        # Iterate through each state or county in data, adding summary data to each
-        # timeseries row.
-        summary_data = {
-            "countryName": region_timeseries.countryName,
-            "countyName": region_timeseries.countyName,
-            "stateName": region_timeseries.stateName,
-            "fips": region_timeseries.fips,
-            "lat": region_timeseries.lat,
-            "long": region_timeseries.long,
-            "intervention": region_timeseries.intervention.name,
-            # TODO(chris): change this to reflect latest time data updated?
-            "lastUpdatedDate": datetime.utcnow(),
-        }
-
-        for timeseries_data in region_timeseries.timeseries:
-            timeseries_row = PredictionTimeseriesRowWithHeader(
-                **summary_data, **timeseries_data.dict()
-            )
-            rows.append(timeseries_row)
-
+    rows = parallel_utils.parallel_map(_build_prediction_rows, bulk_timeseries.__root__)
+    rows = list(itertools.chain.from_iterable(rows))
     return AggregateFlattenedTimeseries(__root__=rows)

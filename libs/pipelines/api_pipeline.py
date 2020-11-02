@@ -172,9 +172,7 @@ def deploy_single_level(intervention, all_timeseries, summary_folder, region_fol
     logger.info(f"Deploying {intervention.name}")
 
     deploy_timeseries_partial = functools.partial(_deploy_timeseries, intervention, region_folder)
-    all_summaries = [
-        deploy_timeseries_partial(region_timeseries) for region_timeseries in all_timeseries
-    ]
+    all_summaries = parallel_utils.parallel_map(deploy_timeseries_partial, all_timeseries)
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
     bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
 

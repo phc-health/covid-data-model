@@ -204,6 +204,8 @@ def deploy_single_level(
         output_path = path_builder.single_timeseries(timeseries, FileType.JSON)
         deploy_json_api_output(timeseries, output_path)
 
+    logger.info(f"Finished writing individual files.")
+
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
     start = time.time()
     flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(bulk_timeseries)

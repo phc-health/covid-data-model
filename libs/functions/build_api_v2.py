@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime
 from typing import Optional
 
@@ -15,6 +16,7 @@ from api.can_api_v2_definition import (
 from covidactnow.datapublic.common_fields import CommonFields
 from libs.datasets.timeseries import OneRegionTimeseriesDataset
 from libs import pipeline
+from libs import parallel_utils
 
 
 def _build_actuals(actual_data: dict) -> Actuals:
@@ -91,34 +93,40 @@ def build_region_timeseries(
     )
 
 
+def _build_timeseries_rows(region_timeseries):
+    # Iterate through each state or county in data, adding summary data to each
+    # timeseries row.
+    summary_data = {
+        "country": region_timeseries.country,
+        "county": region_timeseries.county,
+        "state": region_timeseries.state,
+        "fips": region_timeseries.fips,
+        "lat": region_timeseries.lat,
+        "long": region_timeseries.long,
+        "locationId": region_timeseries.locationId,
+        "lastUpdatedDate": datetime.utcnow(),
+    }
+    actuals_by_date = {row.date: row for row in region_timeseries.actualsTimeseries}
+    metrics_by_date = {row.date: row for row in region_timeseries.metricsTimeseries}
+    dates = sorted({*metrics_by_date.keys(), *actuals_by_date.keys()})
+    rows = []
+    for date in dates:
+        data = {
+            "date": date,
+            "actuals": actuals_by_date.get(date),
+            "metrics": metrics_by_date.get(date),
+        }
+        data.update(summary_data)
+        row = RegionTimeseriesRowWithHeader(**data)
+        rows.append(row)
+
+    return rows
+
+
 def build_bulk_flattened_timeseries(
     bulk_timeseries: AggregateRegionSummary,
 ) -> AggregateFlattenedTimeseries:
-    rows = []
-    for region_timeseries in bulk_timeseries.__root__:
-        # Iterate through each state or county in data, adding summary data to each
-        # timeseries row.
-        summary_data = {
-            "country": region_timeseries.country,
-            "county": region_timeseries.county,
-            "state": region_timeseries.state,
-            "fips": region_timeseries.fips,
-            "lat": region_timeseries.lat,
-            "long": region_timeseries.long,
-            "locationId": region_timeseries.locationId,
-            "lastUpdatedDate": datetime.utcnow(),
-        }
-        actuals_by_date = {row.date: row for row in region_timeseries.actualsTimeseries}
-        metrics_by_date = {row.date: row for row in region_timeseries.metricsTimeseries}
-        dates = sorted({*metrics_by_date.keys(), *actuals_by_date.keys()})
-        for date in dates:
-            data = {
-                "date": date,
-                "actuals": actuals_by_date.get(date),
-                "metrics": metrics_by_date.get(date),
-            }
-            data.update(summary_data)
-            row = RegionTimeseriesRowWithHeader(**data)
-            rows.append(row)
+    rows = parallel_utils.parallel_map(_build_timeseries_rows, bulk_timeseries.__root__)
+    rows = list(itertools.chain.from_iterable(rows))
 
     return AggregateFlattenedTimeseries(__root__=rows)

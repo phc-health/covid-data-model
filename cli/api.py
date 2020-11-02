@@ -207,7 +207,7 @@ def generate_api_v2(model_output_dir, output, aggregation_level, state, fips):
         fips=fips,
         states=active_states,
     )
-    _logger.info(f"Loading all regional inputs.")
+    _logger.info(f"Loading icu, rt, and test data.")
 
     icu_data_path = model_output_dir / SummaryArtifact.ICU_METRIC_COMBINED.value
     icu_data = MultiRegionTimeseriesDataset.from_csv(icu_data_path)
@@ -221,7 +221,7 @@ def generate_api_v2(model_output_dir, output, aggregation_level, state, fips):
     # MultiRegionTimeseriesDataset
     regions_data = combined_datasets.load_us_timeseries_dataset().get_regions_subset(regions)
     regions_data = test_positivity.run_and_maybe_join_columns(regions_data, _logger)
-
+    _logger.info("Building regional inputs")
     regional_inputs = [
         api_v2_pipeline.RegionalInput.from_one_regions(
             region,

@@ -36,7 +36,7 @@ def parallel_map(func: Callable[[T], R], iterable: Iterable[T]) -> Iterable[R]:
         with multiprocessing.Pool(maxtasksperchild=1) as pool:
             return pool.map(func, iterable)
     else:
-        return map(func, iterable)
+        return list(map(func, iterable))
 
 
 def pandas_parallel_apply(
