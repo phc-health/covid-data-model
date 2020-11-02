@@ -32,7 +32,7 @@ logger = structlog.getLogger()
 PROD_BUCKET = "data.covidactnow.org"
 
 
-@dataclass(frozen=True)
+@dataclass
 class RegionalInput:
     region: pipeline.Region
 
@@ -138,6 +138,10 @@ def generate_metrics_and_latest(
 def build_timeseries_for_region(
     regional_input: RegionalInput,
 ) -> Optional[RegionSummaryWithTimeseries]:
+
+    if regional_input.latest[CommonFields.POPULATION] is None:
+        logger.warning(f"No population, skipping.", fips=regional_input.fips)
+        return None
     intervention = regional_input.intervention
 
     if intervention is Intervention.SELECTED_INTERVENTION:
@@ -172,15 +176,25 @@ def deploy_single_level(intervention, all_timeseries, summary_folder, region_fol
     logger.info(f"Deploying {intervention.name}")
 
     deploy_timeseries_partial = functools.partial(_deploy_timeseries, intervention, region_folder)
-    all_summaries = parallel_utils.parallel_map(deploy_timeseries_partial, all_timeseries)
+    all_summaries = [deploy_timeseries_partial(timeseries) for timeseries in all_timeseries]
+    logger.info(f"Finished with writing all individual files")
+
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
     bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
 
+    logger.info(f"Deploying bulk timeseries json")
     deploy_json_api_output(intervention, bulk_timeseries, summary_folder)
+
+    logger.info(f"Deploying bulk summaries json")
     deploy_json_api_output(intervention, bulk_summaries, summary_folder)
+
+    logger.info(f"Deploying bulk summaries csv")
     deploy_csv_api_output(intervention, bulk_summaries, summary_folder)
 
+    logger.info(f"Generate bulk flattened timeseries")
     flattened_timeseries = api.generate_bulk_flattened_timeseries(bulk_timeseries)
+    logger.info(f"Finished generate bulk flattened timeseries")
+
     if not flattened_timeseries.__root__:
         logger.warning(
             "No summaries, skipping deploying bulk data",

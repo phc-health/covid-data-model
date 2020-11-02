@@ -138,19 +138,22 @@ def generate_api(input_dir, output, summary_output, aggregation_level, state, fi
     icu_data = MultiRegionTimeseriesDataset.from_csv(icu_data_path)
     rt_data_path = input_dir / SummaryArtifact.RT_METRIC_COMBINED.value
     rt_data = MultiRegionTimeseriesDataset.from_csv(rt_data_path)
+    _logger.info("Building regions")
+    _load_input = functools.partial(
+        api_pipeline.RegionalInput.from_region_and_intervention,
+        # Giving a phony intervention, will be replaced below
+        intervention=Intervention.NO_INTERVENTION,
+        rt_data=rt_data,
+        icu_data=icu_data,
+    )
+    regional_inputs = parallel_utils.parallel_map(_load_input, regions)
+    _logger.info("Finished building regions")
 
     for intervention in list(Intervention):
         _logger.info(f"Running intervention {intervention.name}")
+        for regional_input in regional_inputs:
+            regional_input.intervention = intervention
 
-        _load_input = functools.partial(
-            api_pipeline.RegionalInput.from_region_and_intervention,
-            intervention=intervention,
-            rt_data=rt_data,
-            icu_data=icu_data,
-        )
-        regional_inputs = parallel_utils.parallel_map(_load_input, regions)
-
-        _logger.info(f"Loaded {len(regional_inputs)} regions.")
         all_timeseries = api_pipeline.run_on_all_regional_inputs_for_intervention(regional_inputs)
         county_timeseries = [
             output for output in all_timeseries if output.aggregate_level is AggregationLevel.COUNTY
