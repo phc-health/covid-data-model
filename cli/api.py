@@ -96,6 +96,22 @@ def update_v2_schemas(api_output_path, schemas_output_dir):
 
 @main.command()
 @click.option(
+    "--test-positivity-all-methods",
+    default="results/output/test-positivity.csv",
+    type=pathlib.Path,
+)
+def generate_test_positivity(test_positivity_all_methods: pathlib.Path):
+    active_states = [state.abbr for state in us.STATES]
+    active_states = active_states + ["PR", "MP"]
+    regions = combined_datasets.get_subset_regions(exclude_county_999=True, states=active_states,)
+
+    regions_data = combined_datasets.load_us_timeseries_dataset().get_regions_subset(regions)
+    test_positivity_results = test_positivity.AllMethods.run(regions_data)
+    test_positivity_results.write(test_positivity_all_methods)
+
+
+@main.command()
+@click.option(
     "--input-dir",
     "-i",
     default="results",
@@ -121,8 +137,7 @@ def update_v2_schemas(api_output_path, schemas_output_dir):
 def generate_api(input_dir, output, summary_output, aggregation_level, state, fips):
     """The entry function for invocation"""
 
-    # Caching load of us timeseries dataset
-    combined_datasets.load_us_timeseries_dataset()
+    us_timeseries = combined_datasets.load_us_timeseries_dataset()
 
     active_states = [state.abbr for state in us.STATES]
     active_states = active_states + ["PR", "MP"]
@@ -136,17 +151,24 @@ def generate_api(input_dir, output, summary_output, aggregation_level, state, fi
 
     icu_data_path = input_dir / SummaryArtifact.ICU_METRIC_COMBINED.value
     icu_data = MultiRegionTimeseriesDataset.from_csv(icu_data_path)
+    icu_data_map = dict(icu_data.iter_one_regions())
+
     rt_data_path = input_dir / SummaryArtifact.RT_METRIC_COMBINED.value
     rt_data = MultiRegionTimeseriesDataset.from_csv(rt_data_path)
+    rt_data_map = dict(rt_data.iter_one_regions())
+
     _logger.info("Building regions")
-    _load_input = functools.partial(
-        api_pipeline.RegionalInput.from_region_and_intervention,
-        # Giving a phony intervention, will be replaced below
-        intervention=Intervention.NO_INTERVENTION,
-        rt_data=rt_data,
-        icu_data=icu_data,
-    )
-    regional_inputs = parallel_utils.parallel_map(_load_input, regions)
+    regional_data = us_timeseries.get_regions_subset(regions)
+    regional_inputs = []
+    for region, region_data in regional_data.iter_one_regions():
+        regional_input = api_pipeline.RegionalInput.from_region_and_intervention(
+            Intervention.NO_INTERVENTION,
+            region,
+            region_data,
+            rt_data_map.get(region),
+            icu_data_map.get(region),
+        )
+        regional_inputs.append(regional_input)
     _logger.info("Finished building regions")
 
     for intervention in list(Intervention):
@@ -155,30 +177,12 @@ def generate_api(input_dir, output, summary_output, aggregation_level, state, fi
             regional_input.intervention = intervention
 
         all_timeseries = api_pipeline.run_on_all_regional_inputs_for_intervention(regional_inputs)
-        county_timeseries = [
-            output for output in all_timeseries if output.aggregate_level is AggregationLevel.COUNTY
-        ]
-        api_pipeline.deploy_single_level(intervention, county_timeseries, summary_output, output)
-        state_timeseries = [
-            output for output in all_timeseries if output.aggregate_level is AggregationLevel.STATE
-        ]
-        api_pipeline.deploy_single_level(intervention, state_timeseries, summary_output, output)
-
-
-@main.command()
-@click.option(
-    "--test-positivity-all-methods",
-    default="results/output/test-positivity.csv",
-    type=pathlib.Path,
-)
-def generate_test_positivity(test_positivity_all_methods: pathlib.Path):
-    active_states = [state.abbr for state in us.STATES]
-    active_states = active_states + ["PR", "MP"]
-    regions = combined_datasets.get_subset_regions(exclude_county_999=True, states=active_states,)
-
-    regions_data = combined_datasets.load_us_timeseries_dataset().get_regions_subset(regions)
-    test_positivity_results = test_positivity.AllMethods.run(regions_data)
-    test_positivity_results.write(test_positivity_all_methods)
+        api_pipeline.deploy_single_level(
+            AggregationLevel.COUNTY, intervention, all_timeseries, summary_output, output
+        )
+        api_pipeline.deploy_single_level(
+            AggregationLevel.STATE, intervention, all_timeseries, summary_output, output
+        )
 
 
 @main.command()

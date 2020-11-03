@@ -42,7 +42,7 @@ class RegionalInput:
 
     intervention: Intervention
 
-    _combined_data: combined_datasets.RegionalData
+    timeseries: OneRegionTimeseriesDataset
 
     @property
     def fips(self) -> str:
@@ -54,37 +54,22 @@ class RegionalInput:
 
     @property
     def latest(self) -> Dict[str, Any]:
-        return self._combined_data.latest
-
-    @property
-    def timeseries(self) -> OneRegionTimeseriesDataset:
-        return self._combined_data.timeseries
+        return self.timeseries.latest
 
     @staticmethod
     def from_region_and_intervention(
-        region: pipeline.Region,
         intervention: Intervention,
-        rt_data: MultiRegionTimeseriesDataset,
-        icu_data: MultiRegionTimeseriesDataset,
+        region: pipeline.Region,
+        regional_data: OneRegionTimeseriesDataset,
+        rt_data: Optional[OneRegionTimeseriesDataset],
+        icu_data: Optional[OneRegionTimeseriesDataset],
     ) -> "RegionalInput":
-        combined_data = combined_datasets.RegionalData.from_region(region)
-
-        try:
-            rt_data = rt_data.get_one_region(region)
-        except timeseries.RegionLatestNotFound:
-            rt_data = None
-
-        try:
-            icu_data = icu_data.get_one_region(region)
-        except timeseries.RegionLatestNotFound:
-            icu_data = None
-
         return RegionalInput(
             region=region,
             intervention=intervention,
-            _combined_data=combined_data,
             rt_data=rt_data,
             icu_data=icu_data,
+            timeseries=regional_data,
         )
 
 
@@ -169,7 +154,9 @@ def _deploy_timeseries(intervention, region_folder, timeseries):
     return region_summary
 
 
-def deploy_single_level(intervention, all_timeseries, summary_folder, region_folder):
+def deploy_single_level(level, intervention, all_timeseries, summary_folder, region_folder):
+    all_timeseries = [output for output in all_timeseries if output.aggregate_level is level]
+
     if not all_timeseries:
         return
 
@@ -190,20 +177,6 @@ def deploy_single_level(intervention, all_timeseries, summary_folder, region_fol
 
     logger.info(f"Deploying bulk summaries csv")
     deploy_csv_api_output(intervention, bulk_summaries, summary_folder)
-
-    logger.info(f"Generate bulk flattened timeseries")
-    flattened_timeseries = api.generate_bulk_flattened_timeseries(bulk_timeseries)
-    logger.info(f"Finished generate bulk flattened timeseries")
-
-    if not flattened_timeseries.__root__:
-        logger.warning(
-            "No summaries, skipping deploying bulk data",
-            intervention=intervention,
-            summary_folder=summary_folder,
-        )
-        return
-
-    deploy_csv_api_output(intervention, flattened_timeseries, summary_folder)
 
 
 def deploy_json_api_output(
