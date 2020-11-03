@@ -192,7 +192,8 @@ def generate_covidactnow_scenarios(t_list, R0, t0, scenario):
 
 
 def get_epsilon_interpolator(
-    eps, t_break, eps2=-1, t_delta_phases=-1, transition_time=14, t_break_final=None, eps_final=None
+    eps, t_break, eps2=-1, t_delta_phases=-1, transition_time=14, t_break_final=None, eps_final=None,
+    summer_peak_norm=0.1, summer_peak_t0=60
 ):
     """
     Return an interpolator that produces an epsilon when called with a time (relative to the model
@@ -240,14 +241,17 @@ def get_epsilon_interpolator(
     else:  # Transition to the provided value
         points.extend(
             [
-                (t_break_final, eps2),
-                (t_break_final + transition_time, eps_final),
+                (t_break_final - transition_time, eps2),
+                (t_break_final, eps_final),
                 (TIMEBOUNDARY, eps_final),
             ]
         )
 
     x, y = zip(*points)
-    return interp1d(x=x, y=y, fill_value="extrapolate")
+    times = np.arange(0, 720)
+    y_base = interp1d(x=x, y=y, fill_value="extrapolate")(times)
+    y_gauss = summer_peak_norm * np.exp(-(times - summer_peak_t0)**2 / 15**2)
+    return interp1d(x=times, y=y_base + y_gauss, fill_value="extrapolate")
 
 
 def piecewise_parametric_policy(x, t_list):

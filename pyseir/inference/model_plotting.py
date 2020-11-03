@@ -87,6 +87,7 @@ def _plot_model_fitter_results(result) -> plt.Figure:
     ax.legend(loc="best", fontsize=14)
     plt.grid(which="both", alpha=0.5)
     plt.title(result.display_name, fontsize=60)
+    plt.yscale('log')
 
     return fig
 

@@ -33,9 +33,14 @@ def calc_chi_sq(obs, predicted, stddev):
 
 @lru_cache(maxsize=None)
 def load_pyseir_fitter_initial_conditions_df():
-    return pd.read_csv(
+    df = pd.read_csv(
         "./pyseir_data/pyseir_fitter_initial_conditions.csv", dtype={"fips": str}
     ).set_index("fips")
+    df['eps_final'] = 0.3
+    df['summer_peak_t0'] = 60
+    df['summer_peak_norm'] = 0.1
+
+    return df
 
 
 @dataclass(frozen=True)
@@ -156,22 +161,31 @@ class ModelFitter:
         limit_eps=[0.20, 1.2],
         error_eps=0.005,
         t_break=20,
-        limit_t_break=[5, 40],
+        limit_t_break=[5, 100],
         error_t_break=1,
         eps2=0.3,
         limit_eps2=[0.20, 2.0],
         error_eps2=0.005,
-        t_delta_phases=30,  # number of days between second and third ramps
-        limit_t_delta_phases=[14, 100],  # good as of June 3, 2020 may need to update in the future
+        t_delta_phases=150,  # number of days between second and third ramps
+        limit_t_delta_phases=[14, 240],  # good as of June 3, 2020 may need to update in the future
         error_t_delta_phases=1,
-        test_fraction=0.1,
+        test_fraction=0.25,
         limit_test_fraction=[0.02, 1],
-        error_test_fraction=0.02,
+        error_test_fraction=0.05,
         hosp_fraction=0.7,
         limit_hosp_fraction=[0.25, 1],
         error_hosp_fraction=0.05,
         # Let's not fit this to start...
         errordef=0.5,
+        eps_final=0.3,
+        limit_eps_final=[0.20, 2.0],
+        error_eps_final=0.005,
+        summer_peak_norm=0.1,
+        limit_summer_peak_norm=[0, .5],
+        error_summer_peak_norm=0.02,
+        summer_peak_t0=60,
+        limit_summer_peak_t0=[30, 120],
+        error_summer_peak_t0=2,
     )
 
     REFF_LOWER_BOUND = 0.7
@@ -184,7 +198,7 @@ class ModelFitter:
         ref_date=datetime(year=2020, month=1, day=1),
         min_deaths=2,
         n_years=1,
-        cases_to_deaths_err_factor=0.5,
+        cases_to_deaths_err_factor=0.1,
         hospital_to_deaths_err_factor=0.5,
         percent_error_on_max_observation=0.5,
     ):
@@ -230,8 +244,11 @@ class ModelFitter:
             "eps",
             "t_break",
             "eps2",
+            "eps_final",
             "t_delta_phases",
             "log10_I_initial",
+            "summer_peak_norm",
+            "summer_peak_t0"
         ]
 
         self.SEIR_kwargs = self.get_average_seir_parameters()
@@ -268,10 +285,13 @@ class ModelFitter:
             "eps",
             "t_break",
             "eps2",
+            "eps_final",
             "t_delta_phases",
             "test_fraction",
             "hosp_fraction",
             "log10_I_initial",
+            "summer_peak_norm",
+            "summer_peak_t0"
         ]
         self.fit_params.update(
             self.regional_input.get_pyseir_fitter_initial_conditions(INITIAL_PARAM_SETS)
@@ -318,6 +338,7 @@ class ModelFitter:
             self.fit_params["R0"] = state_fit_result["R0"]
             self.fit_params["test_fraction"] = state_fit_result["test_fraction"]
             self.fit_params["eps"] = state_fit_result["eps"]
+            self.fit_params["eps_final"] = state_fit_result["eps_final"]
             if cumulative_cases[-1] < 100:
                 self.fit_params["t_break"] = 10
                 self.fit_params["fix_test_fraction"] = True
@@ -438,7 +459,10 @@ class ModelFitter:
 
         return cases_stdev, hosp_stdev, deaths_stdev
 
-    def run_model(self, R0, eps, t_break, eps2, t_delta_phases, log10_I_initial):
+    def run_model(self, R0, eps, t_break, eps2, t_delta_phases, eps_final, t_eps_final_start, log10_I_initial,
+                  summer_peak_norm,
+                  summer_peak_t0
+                  ):
         """
         Generate the model and run.
 
@@ -462,9 +486,12 @@ class ModelFitter:
         model: SEIRModel
             The SEIR model that has been run.
         """
-
         suppression_policy = suppression_policies.get_epsilon_interpolator(
-            eps, t_break, eps2, t_delta_phases
+            eps, t_break, eps2, t_delta_phases,
+            eps_final=eps_final,
+            t_break_final=t_eps_final_start,
+            summer_peak_norm=summer_peak_norm,
+            summer_peak_t0=summer_peak_t0
         )
 
         age_distribution = 1
@@ -494,9 +521,12 @@ class ModelFitter:
         t_break,
         eps2,
         t_delta_phases,
+        eps_final,
         test_fraction,
         hosp_fraction,
         log10_I_initial,
+        summer_peak_norm,
+        summer_peak_t0
     ):
         """
         Fit SEIR model by MLE.
@@ -534,11 +564,14 @@ class ModelFitter:
         # Multiplicative chi2 penalty if future_days are used in second ramp period (set to 1 by default)
         not_allowed_days_penalty = 0.0
 
+        # Look at the last 3 weeks of data. In simulation time, this is given by:
+        t_eps_final_start = (datetime.today() - self.ref_date).days - t0 - 30
+
         # If using more future days than allowed, updated not_allowed_days_penalty
         if number_of_not_allowed_days_used > self.days_allowed_beyond_ref:
             not_allowed_days_penalty = 10 * number_of_not_allowed_days_used
 
-        model = self.run_model(**model_kwargs)
+        model = self.run_model(**model_kwargs, t_eps_final_start=t_eps_final_start)
         # -----------------------------------
         # Chi2 Cases
         # -----------------------------------
@@ -671,7 +704,12 @@ class ModelFitter:
             event=f"Fit results for {self.display_name}:",
             results=f"###{json.dumps(self.fit_results)})###",
         )
-        self.mle_model = self.run_model(**{k: self.fit_results[k] for k in self.model_fit_keys})
+
+        # Look at the last 30 days of data. In simulation time, this is given by:
+        t_eps_final_start = (datetime.today() - self.ref_date).days - self.fit_results['t0'] - 30
+
+        self.mle_model = self.run_model(**{k: self.fit_results[k] for k in self.model_fit_keys},
+                                        t_eps_final_start=t_eps_final_start)
 
     @classmethod
     def run_for_region(cls, regional_input: RegionalInput, n_retries=3) -> Optional["ModelFitter"]:
