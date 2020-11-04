@@ -97,7 +97,7 @@ def generate_api(input_dir, output, summary_output, aggregation_level, state, fi
         aggregation_level, state=state, fips=fips, states=active_states
     )
 
-    for intervention in list(Intervention):
+    for intervention in [Intervention.NO_INTERVENTION]:
         _logger.info(f"Running intervention {intervention.name}")
         all_timeseries = api_pipeline.run_on_all_fips_for_intervention(
             us_latest, us_timeseries, intervention, input_dir

@@ -1,9 +1,6 @@
 from datetime import datetime, timedelta
-import pandas as pd
 import numpy as np
 from scipy.interpolate import interp1d
-from pyseir import load_data
-from pyseir.inference.infer_t0 import infer_t0
 
 
 # Fig 4 of Imperial college.
@@ -195,7 +192,8 @@ def generate_covidactnow_scenarios(t_list, R0, t0, scenario):
 
 
 def get_epsilon_interpolator(
-    eps, t_break, eps2=-1, t_delta_phases=-1, transition_time=14, t_break_final=None, eps_final=None
+    eps, t_break, eps2=-1, t_delta_phases=-1, transition_time=14, t_break_final=None, eps_final=None,
+    summer_peak_norm=0.1, summer_peak_t0=60
 ):
     """
     Return an interpolator that produces an epsilon when called with a time (relative to the model
@@ -243,105 +241,17 @@ def get_epsilon_interpolator(
     else:  # Transition to the provided value
         points.extend(
             [
-                (t_break_final, eps2),
-                (t_break_final + transition_time, eps_final),
+                (t_break_final - transition_time, eps2),
+                (t_break_final, eps_final),
                 (TIMEBOUNDARY, eps_final),
             ]
         )
 
     x, y = zip(*points)
-    return interp1d(x=x, y=y, fill_value="extrapolate")
-
-
-def generate_empirical_distancing_policy(
-    t_list, fips, future_suppression, reference_start_date=None
-):
-    """
-    Produce a suppression policy based on Imperial College estimates of social
-    distancing programs combined with County level datasets about their
-    implementation.
-
-    Parameters
-    ----------
-    t_list: array-like
-        List of times to interpolate over.
-    fips: str
-        County fips to lookup interventions against.
-    future_suppression: float
-        The suppression level to apply in an ongoing basis after today, and
-        going backward as the lockdown / stay-at-home efficacy.
-    reference_start_date: pd.Timestamp
-        Start date as reference to shift t_list.
-
-    Returns
-    -------
-    suppression_model: callable
-        suppression_model(t) returns the current suppression model at time t.
-    """
-
-    t0 = infer_t0(fips)
-    reference_start_date = reference_start_date or t0
-
-    rho = []
-
-    # Check for fips that don't match.
-    public_implementations = load_data.load_public_implementations_data()
-
-    # Not all counties present in this dataset.
-    if fips not in public_implementations.index:
-        # Then assume 1.0 until today and then future_suppression going forward.
-        for t_step in t_list:
-            t_actual = t0 + timedelta(days=t_step)
-            if t_actual <= datetime.now():
-                rho.append(1.0)
-            else:
-                rho.append(future_suppression)
-    else:
-        policies = public_implementations.loc[fips].to_dict()
-        for t_step in t_list:
-            t_actual = t0 + timedelta(days=t_step)
-            rho_this_t = 1
-
-            # If this is a future date, assume lockdown continues.
-            if t_actual > datetime.utcnow():
-                rho.append(future_suppression)
-                continue
-
-            # If the policy was enacted on this timestep then activate it in
-            # addition to others. These measures are additive unless lockdown is
-            # instituted.
-            for independent_measure in [
-                "public_schools",
-                "entertainment_gym",
-                "restaurant_dine-in",
-                "federal_guidelines",
-            ]:
-
-                if (
-                    not pd.isnull(policies[independent_measure])
-                    and t_actual > policies[independent_measure]
-                ):
-                    rho_this_t -= distancing_measure_suppression[independent_measure]
-
-            # Only take the max of these, since 500 doesn't matter if 50 is enacted.
-            if not pd.isnull(policies["50_gatherings"]) and t_actual > policies["50_gatherings"]:
-                rho_this_t -= distancing_measure_suppression["50_gatherings"]
-            elif (
-                not pd.isnull(policies["500_gatherings"]) and t_actual > policies["500_gatherings"]
-            ):
-                rho_this_t -= distancing_measure_suppression["500_gatherings"]
-
-            # If lockdown, then we don't care about any others, just set to
-            # future suppression.
-            if pd.isnull(policies["stay_at_home"]) and t_actual > policies["stay_at_home"]:
-                rho_this_t = future_suppression
-            rho.append(rho_this_t)
-
-    t_list_since_reference_date = (
-        t_list + (pd.to_datetime(t0) - pd.to_datetime(reference_start_date)).days
-    )
-
-    return interp1d(t_list_since_reference_date, rho, fill_value="extrapolate")
+    times = np.arange(0, 720)
+    y_base = interp1d(x=x, y=y, fill_value="extrapolate")(times)
+    y_gauss = summer_peak_norm * np.exp(-(times - summer_peak_t0)**2 / 15**2)
+    return interp1d(x=times, y=y_base + y_gauss, fill_value="extrapolate")
 
 
 def piecewise_parametric_policy(x, t_list):
