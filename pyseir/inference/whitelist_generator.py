@@ -58,7 +58,7 @@ class WhitelistGenerator:
         columns = [CommonFields.FIPS, CommonFields.STATE, CommonFields.COUNTY]
         counties = latest_values.data[columns]
         # parallel load and compute
-        df_candidates = counties.fips.parallel_apply(_whitelist_candidates_per_fips)
+        df_candidates = counties.fips.apply(_whitelist_candidates_per_fips)
         # join extra data
         df_candidates = df_candidates.merge(counties, left_on="fips", right_on="fips", how="inner",)
         df_candidates["inference_ok"] = (
