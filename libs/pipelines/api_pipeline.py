@@ -97,9 +97,12 @@ def build_timeseries_for_fips(
         state = fips_latest[CommonFields.STATE]
         intervention = get_can_projection.get_intervention_for_state(state)
 
+
+
     model_output = CANPyseirLocationOutput.load_from_model_output_if_exists(
         fips, intervention, model_output_dir
     )
+
     if not model_output and intervention is not Intervention.OBSERVED_INTERVENTION:
         # All model output is currently tied to a specific intervention. However,
         # we want to generate results for regions that don't have a fit result, but we're not

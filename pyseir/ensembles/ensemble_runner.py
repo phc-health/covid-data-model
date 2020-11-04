@@ -252,19 +252,21 @@ class EnsembleRunner:
         # Determine the appropriate future suppression policy based on the
         # scenario of interest.
 
-        eps_final = sp.estimate_future_suppression_from_fits(inferred_params, scenario=scenario)
+        #eps_final = sp.estimate_future_suppression_from_fits(inferred_params, scenario=scenario)
 
-        model.suppression_policy = sp.get_epsilon_interpolator(
-            eps=inferred_params["eps"],
-            t_break=inferred_params["t_break"],
-            eps2=inferred_params["eps2"],
-            t_delta_phases=inferred_params["t_delta_phases"],
-            t_break_final=(
-                datetime.datetime.today()
-                - datetime.datetime.fromisoformat(inferred_params["t0_date"])
-            ).days,
-            eps_final=eps_final,
-        )
+        # model.suppression_policy = sp.get_epsilon_interpolator(
+        #     eps=inferred_params["eps"],
+        #     t_break=inferred_params["t_break"],
+        #     eps2=inferred_params["eps2"],
+        #     t_delta_phases=inferred_params["t_delta_phases"],
+        #     t_break_final=(
+        #         datetime.datetime.today()
+        #         - datetime.datetime.fromisoformat(inferred_params["t0_date"])
+        #     ).days,
+        #     summer_peak_norm=inferred_params["summer_peak_norm"],
+        #     summer_peak_to=inferred_params["summer_peak_t0"],
+        #     eps_final=inferred_params["eps_final"],
+        # )
         model.run()
         return model
 
