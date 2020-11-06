@@ -126,7 +126,7 @@ def _build_timeseries_rows(region_timeseries):
 def build_bulk_flattened_timeseries(
     bulk_timeseries: AggregateRegionSummary,
 ) -> AggregateFlattenedTimeseries:
-    rows = parallel_utils.parallel_map(_build_timeseries_rows, bulk_timeseries.__root__)
+    rows = map(_build_timeseries_rows, bulk_timeseries.__root__)
     rows = list(itertools.chain.from_iterable(rows))
 
     return AggregateFlattenedTimeseries(__root__=rows)
