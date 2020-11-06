@@ -213,6 +213,17 @@ class RegionSummaryWithTimeseries(RegionSummary):
 
         return RegionSummary(**data)
 
+    def recent_summary_with_timeseries(self, days_back: int = 30):
+        cutoff_date = datetime.datetime.utcnow().date() - datetime.timedelta(days=days_back)
+        metrics_timeseries = [row for row in self.metricsTimeseries if row.date >= cutoff_date]
+        actuals_timeseries = [row for row in self.actualsTimeseries if row.date >= cutoff_date]
+        return self.copy(
+            update={
+                "metricsTimeseries": metrics_timeseries,
+                "actualsTimeseries": actuals_timeseries,
+            }
+        )
+
 
 class AggregateRegionSummary(base_model.APIBaseModel):
     """Summary data for multiple regions."""

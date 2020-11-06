@@ -52,6 +52,14 @@ class APIOutputPathBuilder:
         assert file_type is FileType.JSON
         return self.root / f"{self.region_key}.timeseries.{file_type.suffix}"
 
+    def bulk_recent_timeseries(
+        self,
+        aggregate_timeseries_summary: can_api_v2_definition.AggregateRegionSummaryWithTimeseries,
+        file_type: FileType,
+    ) -> str:
+        assert file_type is FileType.JSON
+        return self.root / f"{self.region_key}.timeseries.recent.{file_type.suffix}"
+
     def bulk_summary(
         self, aggregate_summary: can_api_v2_definition.AggregateRegionSummary, file_type: FileType
     ) -> str:
@@ -60,6 +68,10 @@ class APIOutputPathBuilder:
     def bulk_flattened_timeseries_data(self, file_type):
         assert file_type is FileType.CSV
         return self.root / f"{self.region_key}.timeseries.{file_type.suffix}"
+
+    def bulk_flattened_recent_timeseries_data(self, file_type):
+        assert file_type is FileType.CSV
+        return self.root / f"{self.region_key}.timeseries.recent.{file_type.suffix}"
 
     def single_summary(self, region_summary: can_api_v2_definition.RegionSummary, file_type):
         if self.level is AggregationLevel.STATE:
@@ -77,5 +89,22 @@ class APIOutputPathBuilder:
             return self.region_subdir / f"{region_timeseries.state}.timeseries.{file_type.suffix}"
         if self.level is AggregationLevel.COUNTY:
             return self.region_subdir / f"{region_timeseries.fips}.timeseries.{file_type.suffix}"
+
+        raise NotImplementedError("Level not supported")
+
+    def single_recent_timeseries(
+        self, region_timeseries: can_api_v2_definition.RegionSummaryWithTimeseries, file_type
+    ):
+
+        if self.level is AggregationLevel.STATE:
+            return (
+                self.region_subdir
+                / f"{region_timeseries.state}.timeseries.recent.{file_type.suffix}"
+            )
+        if self.level is AggregationLevel.COUNTY:
+            return (
+                self.region_subdir
+                / f"{region_timeseries.fips}.timeseries.recent.{file_type.suffix}"
+            )
 
         raise NotImplementedError("Level not supported")

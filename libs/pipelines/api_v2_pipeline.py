@@ -191,6 +191,11 @@ def deploy_single_level(
     # Filter all timeseries to just aggregate level.
     all_timeseries = [output for output in all_timeseries if output.level is level]
     all_summaries = [output.region_summary for output in all_timeseries]
+    all_recent_timeseries = [
+        output.recent_summary_with_timeseries()
+        for output in all_timeseries
+        if output.level is level
+    ]
 
     if not all_timeseries:
         logger.warning(f"No regions detected - skipping.", aggregate_level=level.value)
@@ -206,6 +211,10 @@ def deploy_single_level(
         output_path = path_builder.single_timeseries(timeseries, FileType.JSON)
         deploy_json_api_output(timeseries, output_path)
 
+    for timeseries in all_recent_timeseries:
+        output_path = path_builder.single_recent_timeseries(timeseries, FileType.JSON)
+        deploy_json_api_output(timeseries, output_path)
+
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
     start = time.time()
     flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(bulk_timeseries)
@@ -213,14 +222,28 @@ def deploy_single_level(
     logger.info(
         f"Built bulk flattened timeseries in {duration} seconds", aggregate_level=level.value
     )
+
+    # Deplly bulk timeseries
     output_path = path_builder.bulk_flattened_timeseries_data(FileType.CSV)
     deploy_csv_api_output(
         flattened_timeseries, output_path, keys_to_skip=["actuals.date", "metrics.date"]
     )
-
     output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON)
     deploy_json_api_output(bulk_timeseries, output_path)
 
+    # Deploy bulk recent timeseries
+    bulk_recent_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_recent_timeseries)
+    flattened_recent_timeseries = build_api_v2.build_bulk_flattened_timeseries(
+        bulk_recent_timeseries
+    )
+    output_path = path_builder.bulk_flattened_recent_timeseries_data(FileType.CSV)
+    deploy_csv_api_output(
+        flattened_recent_timeseries, output_path, keys_to_skip=["actuals.date", "metrics.date"]
+    )
+    output_path = path_builder.bulk_recent_timeseries(bulk_recent_timeseries, FileType.JSON)
+    deploy_json_api_output(bulk_recent_timeseries, output_path)
+
+    # Deploy bulk summaries
     bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
     output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON)
     deploy_json_api_output(bulk_summaries, output_path)
