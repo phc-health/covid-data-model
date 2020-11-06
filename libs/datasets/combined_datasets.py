@@ -25,7 +25,7 @@ from libs.datasets.timeseries import TimeseriesDataset
 from libs.datasets.latest_values_dataset import LatestValuesDataset
 from libs.datasets.sources.nytimes_dataset import NYTimesDataset
 from libs.datasets.sources.nha_hospitalization import NevadaHospitalAssociationData
-from libs.datasets.sources.cds_dataset import CDSDataset
+#from libs.datasets.sources.cds_dataset import CDSDataset
 from libs.datasets.sources.covid_tracking_source import CovidTrackingDataSource
 from libs.datasets.sources.covid_care_map import CovidCareMapBeds
 from libs.datasets.sources.fips_population import FIPSPopulation
@@ -60,8 +60,8 @@ ALL_TIMESERIES_FEATURE_DEFINITION: FeatureDataSourceMap = {
     CommonFields.ALL_BED_TYPICAL_OCCUPANCY_RATE: [],
     CommonFields.CASES: [NYTimesDataset],
     CommonFields.CONTACT_TRACERS_COUNT: [TestAndTraceData],
-    CommonFields.CUMULATIVE_HOSPITALIZED: [CDSDataset, CovidTrackingDataSource],
-    CommonFields.CUMULATIVE_ICU: [CDSDataset, CovidTrackingDataSource],
+    CommonFields.CUMULATIVE_HOSPITALIZED: [CovidTrackingDataSource],
+    CommonFields.CUMULATIVE_ICU: [CovidTrackingDataSource],
     CommonFields.CURRENT_HOSPITALIZED: [
         CovidCountyDataDataSource,
         CovidTrackingDataSource,
@@ -85,8 +85,8 @@ ALL_TIMESERIES_FEATURE_DEFINITION: FeatureDataSourceMap = {
     CommonFields.ICU_TYPICAL_OCCUPANCY_RATE: [],
     CommonFields.LICENSED_BEDS: [],
     CommonFields.MAX_BED_COUNT: [],
-    CommonFields.NEGATIVE_TESTS: [CDSDataset, CovidCountyDataDataSource, CovidTrackingDataSource],
-    CommonFields.POSITIVE_TESTS: [CDSDataset, CovidCountyDataDataSource, CovidTrackingDataSource],
+    CommonFields.NEGATIVE_TESTS: [CovidCountyDataDataSource, CovidTrackingDataSource],
+    CommonFields.POSITIVE_TESTS: [CovidCountyDataDataSource, CovidTrackingDataSource],
     CommonFields.RECOVERED: [],
     CommonFields.STAFFED_BEDS: [CovidCountyDataDataSource],
 }
@@ -252,7 +252,9 @@ def _build_data_and_provenance(
     datasource_dataframes: Mapping[str, pd.DataFrame],
     override=Override.BY_TIMESERIES,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    fips_indexed = dataset_utils.fips_index_geo_data(pd.concat(datasource_dataframes.values()))
+    df = pd.concat(datasource_dataframes.values())
+
+    fips_indexed = dataset_utils.fips_index_geo_data(df[~df.index.duplicated(keep='first')])
 
     # Inspired by pd.Series.combine_first(). Create a new index which is a union of all the input dataframe
     # index.

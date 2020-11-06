@@ -376,5 +376,9 @@ def fips_index_geo_data(df: pd.DataFrame) -> pd.DataFrame:
     all_identifiers = df.loc[:, present_columns].drop_duplicates()
     # Make a DataFrame with a unique FIPS index. If multiple rows are found with the same FIPS then there
     # are rows in the input data sources that have different values for county name, state etc.
-    fips_indexed = all_identifiers.set_index(CommonFields.FIPS, verify_integrity=True)
+    print(all_identifiers.reset_index())
+    fips_indexed = all_identifiers.reset_index().drop_duplicates('fips').set_index('fips')
+
+
+    #fips_indexed = all_identifiers.set_index(CommonFields.FIPS, verify_integrity=True, )
     return fips_indexed
