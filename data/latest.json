@@ -2,14 +2,14 @@
   "dataset_type": "latest",
   "path": "data/latest.csv",
   "data_git_info": {
-    "sha": "4416f392dbfa6d6963425fde529a61c881935d30",
-    "branch": "master",
-    "is_dirty": false
+    "sha": "8247172846f520bae73f9d39174f4840e6d46afb",
+    "branch": "mikelehen/wipe-cms-archive",
+    "is_dirty": true
   },
   "model_git_info": {
-    "sha": "50f0b1512ac3e9e9da181eb441c74c9a368c10fb",
-    "branch": "master",
-    "is_dirty": false
+    "sha": "2c339383e273271ceca32c28608c0f7c22b6f51f",
+    "branch": "mikelehen/tp-tests",
+    "is_dirty": true
   },
-  "updated_at": "2020-11-14T11:59:18.974959"
+  "updated_at": "2020-11-15T00:48:55.618481"
 }
