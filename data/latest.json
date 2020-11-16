@@ -2,14 +2,14 @@
   "dataset_type": "latest",
   "path": "data/latest.csv",
   "data_git_info": {
-    "sha": "f0da5ae68cb1b9224f3e66b5ccf2dcca5375b10f",
-    "branch": "master",
-    "is_dirty": false
+    "sha": "79747353df919eb74b0333c59cd25bd8d8bc9795",
+    "branch": "mikelehen/reenable-hhs-states",
+    "is_dirty": true
   },
   "model_git_info": {
-    "sha": "6398cbc8c3ebd13c0ac7bf81f7ef33d382df9a10",
+    "sha": "9136c8b38d25e5338af575cb7864d4a121848f2b",
     "branch": "master",
     "is_dirty": false
   },
-  "updated_at": "2020-11-16T12:00:14.111351"
+  "updated_at": "2020-11-16T19:18:31.072592"
 }
