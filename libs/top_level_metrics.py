@@ -115,7 +115,7 @@ def calculate_metrics_for_timeseries(
 def calculate_fake_rt(case_density: pd.Series):
     two_week_ratio = case_density / (case_density.shift(14) + 0.0000000001)
 
-    return two_week_ratio
+    return two_week_ratio.clip(lower=0, upper=3)
 
 
 def _lookup_test_positivity_method(
