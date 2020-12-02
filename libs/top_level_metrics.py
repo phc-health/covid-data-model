@@ -61,20 +61,21 @@ def calculate_metrics_for_timeseries(
 
     data = timeseries.data.set_index(CommonFields.DATE)
 
+    new_cases = data[CommonFields.NEW_CASES]
+    case_density = calculate_case_density(new_cases, population)
+
     estimated_current_icu = None
     infection_rate = np.nan
     infection_rate_ci90 = np.nan
+
     if rt_data and not rt_data.empty:
         rt_data = rt_data.date_indexed
-        infection_rate = rt_data["Rt_MAP_composite"]
+        infection_rate = calculate_fake_rt(case_density)
         infection_rate_ci90 = rt_data["Rt_ci95_composite"] - rt_data["Rt_MAP_composite"]
 
     if icu_data and not icu_data.empty:
         icu_data = icu_data.date_indexed
         estimated_current_icu = icu_data[CommonFields.CURRENT_ICU]
-
-    new_cases = data[CommonFields.NEW_CASES]
-    case_density = calculate_case_density(new_cases, population)
 
     test_positivity, test_positivity_details = calculate_or_copy_test_positivity(timeseries, log)
 
@@ -109,6 +110,12 @@ def calculate_metrics_for_timeseries(
         )
 
     return metrics, metric_summary
+
+
+def calculate_fake_rt(case_density: pd.Series):
+    two_week_ratio = case_density / (case_density.shift(14) + 0.0000000001)
+
+    return two_week_ratio
 
 
 def _lookup_test_positivity_method(
