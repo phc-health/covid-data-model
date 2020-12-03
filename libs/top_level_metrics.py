@@ -113,10 +113,10 @@ def calculate_metrics_for_timeseries(
 
 
 def calculate_fake_rt(case_density: pd.Series):
-    ratio = case_density / (case_density.shift(7) + 0.0000000001)
 
+    ratio = case_density / (case_density.shift(7) + 0.0000000001)
     ratio = ratio.clip(lower=0, upper=3)
-    return series_utils.smooth_with_rolling_average(ratio)
+    return ratio
 
 
 def _lookup_test_positivity_method(

@@ -2,6 +2,7 @@ from datetime import timedelta
 import datetime
 import pandas as pd
 import numpy as np
+from pyseir.rt.constants import InferRtConstants
 
 
 def smooth_with_rolling_average(
@@ -44,7 +45,14 @@ def smooth_with_rolling_average(
 
     # Apply function to a rolling window
     # https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.core.window.rolling.Rolling.apply.html
-    rolling_average = series.rolling(window, min_periods=1).apply(mean_with_no_trailing_nan)
+    rolling_average = series.rolling(
+        InferRtConstants.COUNT_SMOOTHING_WINDOW_SIZE,
+        win_type="gaussian",
+        min_periods=InferRtConstants.COUNT_SMOOTHING_KERNEL_STD,
+        center=True,
+    ).mean(std=InferRtConstants.COUNT_SMOOTHING_KERNEL_STD)
+
+    # rolling_average = series.rolling(window, min_periods=1).apply(mean_with_no_trailing_nan)
     if include_trailing_zeros:
         return rolling_average
 
