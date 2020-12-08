@@ -19,4 +19,8 @@ class NYTimesDataset(data_source.DataSource):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH
         input_path = data_root / cls.DATA_PATH
         data = common_df.read_csv(input_path).reset_index()
+
+        # Extra columns that we don't need and cause issues with aggregation.
+        data = data.drop([CommonFields.COUNTY, CommonFields.STATE_FULL_NAME], axis=1)
+
         return cls(data)

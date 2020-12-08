@@ -1144,6 +1144,7 @@ def combined_datasets(
     # A list of Series that will be concat-ed
     provenance_series = []
     for field, dataset_names in timeseries_field_dataset_source.items():
+        _log.info(f"Processing timeseries {field}")
         # Iterate through the datasets for this field. For each dataset add location_id with data
         # in field to location_id_so_far iff the location_id is not already there.
         location_id_so_far = pd.Index([])
@@ -1162,6 +1163,7 @@ def combined_datasets(
 
     static_series = []
     for field, dataset_names in static_field_dataset_source.items():
+        _log.info(f"Processing static {field}")
         static_column_so_far = None
         for dataset_name in dataset_names:
             dataset_column = datasets[dataset_name].static.get(field)
