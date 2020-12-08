@@ -2,14 +2,14 @@
   "dataset_type": "multiregion",
   "path": "data/multiregion.csv",
   "data_git_info": {
-    "sha": "61ed3906d124e0f2b3c897206c1e4856e1c2fa08",
-    "branch": "master",
+    "sha": "f0e7a2238a2e98fd0a6d31388fa94d467243fcdb",
+    "branch": "remove-trailing-zeros-in-cdc-testing",
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "1511214e9aa51e88ea5102bcdbbc035aab937611",
-    "branch": "master",
+    "sha": "37b1136837efea041281a428495596f5e1735c98",
+    "branch": "enable-cdc-testing",
     "is_dirty": false
   },
-  "updated_at": "2020-12-08T20:47:17.707187"
+  "updated_at": "2020-12-08T21:37:01.412469"
 }
