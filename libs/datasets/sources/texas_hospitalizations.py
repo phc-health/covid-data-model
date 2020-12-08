@@ -12,15 +12,9 @@ class TexasHospitalizations(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {
-        CommonFields.CURRENT_HOSPITALIZED: CommonFields.CURRENT_HOSPITALIZED,
-        CommonFields.CURRENT_ICU: CommonFields.CURRENT_ICU,
-    }
-
     @classmethod
     def local(cls):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH
         input_path = data_root / cls.DATA_PATH
         data = common_df.read_csv(input_path).reset_index()
-        # Column names are already CommonFields so don't need to rename
         return cls(data)

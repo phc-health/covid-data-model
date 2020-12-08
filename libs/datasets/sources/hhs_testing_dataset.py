@@ -12,8 +12,6 @@ class HHSTestingDataset(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {f: f for f in {CommonFields.NEGATIVE_TESTS, CommonFields.POSITIVE_TESTS,}}
-
     @classmethod
     def local(cls):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH

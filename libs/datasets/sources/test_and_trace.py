@@ -23,13 +23,10 @@ class TestAndTraceData(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {f: f for f in [CommonFields.CONTACT_TRACERS_COUNT]}
-
     @classmethod
     def standardize_data(cls, data):
         data[cls.Fields.COUNTRY] = "USA"
         data[cls.Fields.AGGREGATE_LEVEL] = AggregationLevel.STATE.value
-        data = cls._rename_to_common_fields(data)
         return data
 
     @classmethod

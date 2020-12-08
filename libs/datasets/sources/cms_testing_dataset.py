@@ -13,8 +13,6 @@ class CMSTestingDataset(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {f: f for f in {CommonFields.TEST_POSITIVITY}}
-
     @classmethod
     def local(cls):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH

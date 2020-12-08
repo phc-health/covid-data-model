@@ -12,10 +12,6 @@ class ForecastHubDataset(data_source.DataSource):
         # Not Yet Implemented -> Currently only a move from covid-data-public to covid-data-model
     }
 
-    COMMON_FIELD_MAP = {
-        # Not Yet Implemented -> Currently only a move from covid-data-public to covid-data-model
-    }
-
     @classmethod
     def local(cls):
         """
@@ -28,4 +24,4 @@ class ForecastHubDataset(data_source.DataSource):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH
         input_path = data_root / cls.DATA_PATH
         data = common_df.read_csv(input_path, set_index=False)
-        return cls(cls._rename_to_common_fields(data))
+        return data

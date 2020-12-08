@@ -12,22 +12,10 @@ class CovidCareMapBeds(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in LatestValuesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {
-        f: f
-        for f in {
-            CommonFields.STAFFED_BEDS,
-            CommonFields.LICENSED_BEDS,
-            CommonFields.ICU_BEDS,
-            CommonFields.ALL_BED_TYPICAL_OCCUPANCY_RATE,
-            CommonFields.ICU_TYPICAL_OCCUPANCY_RATE,
-            CommonFields.MAX_BED_COUNT,
-        }
-    }
-
     @classmethod
     def local(cls):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH
         input_path = data_root / cls.STATIC_CSV
         # Can't use common_df.read_csv because it expects a date column
         data = pd.read_csv(input_path, dtype={CommonFields.FIPS: str})
-        return cls(cls._rename_to_common_fields(data))
+        return cls(data)

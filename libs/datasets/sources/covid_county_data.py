@@ -31,27 +31,6 @@ class CovidCountyDataDataSource(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
 
-    # Keep in sync with update_covid_county_data.py in the covid-data-public repo.
-    # DataSource objects must have a map from CommonFields to fields in the source file.
-    # For this source the conversion is done in the covid-data-public repo so the map
-    # here doesn't represent any field renaming.
-    COMMON_FIELD_MAP = {
-        f: f
-        for f in {
-            CommonFields.CASES,
-            CommonFields.DEATHS,
-            CommonFields.CURRENT_ICU,
-            CommonFields.CURRENT_ICU_TOTAL,
-            CommonFields.NEGATIVE_TESTS,
-            CommonFields.POSITIVE_TESTS,
-            CommonFields.STAFFED_BEDS,
-            CommonFields.HOSPITAL_BEDS_IN_USE_ANY,
-            CommonFields.CURRENT_VENTILATED,
-            CommonFields.CURRENT_HOSPITALIZED,
-            CommonFields.ICU_BEDS,
-        }
-    }
-
     @classmethod
     def synthesize_test_metrics(cls, data: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
         """
@@ -155,7 +134,7 @@ class CovidCountyDataDataSource(data_source.DataSource):
         input_path = data_root / cls.DATA_PATH
         data = common_df.read_csv(input_path).reset_index()
         data, provenance = cls.synthesize_test_metrics(data)
-        # Column names are already CommonFields so don't need to rename
+
         return cls(data, provenance=provenance)
 
     @lru_cache(None)

@@ -139,7 +139,7 @@ class TimeseriesDataset(dataset_base.DatasetBase):
     COMMON_INDEX_FIELDS = COMMON_FIELDS_TIMESERIES_KEYS
 
 
-def _add_location_id(df: pd.DataFrame) -> pd.DataFrame:
+def add_location_id(df: pd.DataFrame) -> pd.DataFrame:
     """Adds the location_id column derived from FIPS"""
     if CommonFields.LOCATION_ID in df.columns:
         raise ValueError("location_id already in DataFrame")
@@ -409,7 +409,7 @@ class MultiRegionDataset(SaveableDatasetInterface):
         return MultiRegionDataset(timeseries=timeseries_df, static=static_df)
 
     def add_fips_static_df(self, latest_df: pd.DataFrame) -> "MultiRegionDataset":
-        latest_df = _add_location_id(latest_df)
+        latest_df = add_location_id(latest_df)
         return self.add_static_values(latest_df)
 
     def add_static_values(self, attributes_df: pd.DataFrame) -> "MultiRegionDataset":
@@ -469,7 +469,7 @@ class MultiRegionDataset(SaveableDatasetInterface):
 
     @staticmethod
     def from_fips_timeseries_df(ts_df: pd.DataFrame) -> "MultiRegionDataset":
-        ts_df = _add_location_id(ts_df)
+        ts_df = add_location_id(ts_df)
         return MultiRegionDataset.from_geodata_timeseries_df(ts_df)
 
     def add_fips_provenance(self, provenance):

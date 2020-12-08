@@ -12,12 +12,10 @@ class CANLocationPageURLS(data_source.DataSource):
 
     INDEX_FIELD_MAP = {f: f for f in LatestValuesDataset.INDEX_FIELDS}
 
-    COMMON_FIELD_MAP = {f: f for f in {CommonFields.CAN_LOCATION_PAGE_URL,}}
-
     @classmethod
     def local(cls):
         data_root = dataset_utils.LOCAL_PUBLIC_DATA_PATH
         input_path = data_root / cls.STATIC_CSV
         # Can't use common_df.read_csv because it expects a date column
         data = pd.read_csv(input_path, dtype={CommonFields.FIPS: str})
-        return cls(cls._rename_to_common_fields(data))
+        return cls(data)
