@@ -2,6 +2,7 @@ import io
 import pathlib
 import pytest
 import pandas as pd
+import numpy as np
 import structlog
 
 from covidactnow.datapublic.common_fields import CommonFields
@@ -889,6 +890,17 @@ def test_not_removing_short_series():
 
     # Should not modify becasue not higher than threshold
     assert_dataset_like(dataset, result)
+
+
+def test_remove_trailing_zeros():
+    values = [190] * 10 + [200] * 10 + [0.0]
+    dataset = _build_one_column_multiregion_dataset(CommonFields.NEW_CASES, values)
+    dataset = timeseries.drop_new_case_outliers(dataset)
+
+    # Expected result is the same series with the last value removed
+    values[-1] = np.nan
+    expected = _build_one_column_multiregion_dataset(CommonFields.NEW_CASES, values)
+    assert_dataset_like(dataset, expected)
 
 
 def test_timeseries_empty_timeseries_and_static():

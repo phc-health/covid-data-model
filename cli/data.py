@@ -91,7 +91,14 @@ def update(
         build_field_dataset_source(ALL_FIELDS_FEATURE_DEFINITION),
     )
     multiregion_dataset = timeseries.add_new_cases(multiregion_dataset)
+
+    wide_dates_df.write_csv(
+        multiregion_dataset.timeseries_rows(), f"before-new-case-filter-wide-dates.csv"
+    )
     multiregion_dataset = timeseries.drop_new_case_outliers(multiregion_dataset)
+    wide_dates_df.write_csv(
+        multiregion_dataset.timeseries_rows(), f"after-new-case-filter-wide-dates.csv"
+    )
     multiregion_dataset = timeseries.drop_regions_without_population(
         multiregion_dataset, KNOWN_LOCATION_ID_WITHOUT_POPULATION, structlog.get_logger()
     )

@@ -815,6 +815,25 @@ def drop_new_case_outliers(
     return new_timeseries
 
 
+def drop_trailing_new_case_zeros(ds_in: MultiRegionDataset) -> MultiRegionDataset:
+    cases_wide_dates = ds_in.timeseries_wide_dates().loc[
+        pd.IndexSlice[:, CommonFields.NEW_CASES], :
+    ]
+    most_recent_day = cases_wide_dates.columns[-1]
+    back_14d = most_recent_day - pd.DateOffset(14)
+    new_cases_14d = cases_wide_dates.loc[:, pd.IndexSlice[back_14d:most_recent_day]]
+    assert new_cases_14d.index.names == [CommonFields.LOCATION_ID, PdFields.VARIABLE]
+    new_cases_14d_sum = new_cases_14d.sum(axis=1)
+    lots_of_cases = (new_cases_14d_sum > (14 * 100)).index
+    recent_suspect_zeros = new_cases_14d.loc[lots_of_cases, :] == 0
+    cases_wide_dates.loc[recent_suspect_zeros.index] = np.nan
+    cases_patched = cases_wide_dates.stack(dropna=False)
+    timeseries_patched = ds_in.timeseries.copy()
+    timeseries_patched.loc[cases_patched.index] = cases_patched
+
+    return dataclasses.replace(ds_in, timeseries=timeseries_patched)
+
+
 def drop_regions_without_population(
     mrts: MultiRegionDataset,
     known_location_id_to_drop: Sequence[str],
