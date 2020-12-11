@@ -18,6 +18,23 @@ GEO_DATA_COLUMNS = [
     CommonFields.COUNTY,
 ]
 
+NON_NUMERIC_COLUMNS = GEO_DATA_COLUMNS + [CommonFields.CAN_LOCATION_PAGE_URL]
+
+STATIC_INDEX_FIELDS = [
+    CommonFields.AGGREGATE_LEVEL,
+    CommonFields.COUNTRY,
+    CommonFields.STATE,
+    CommonFields.FIPS,
+]
+
+TIMESERIES_INDEX_FIELDS = [
+    CommonFields.DATE,
+    CommonFields.AGGREGATE_LEVEL,
+    CommonFields.COUNTRY,
+    CommonFields.STATE,
+    CommonFields.FIPS,
+]
+
 
 def _get_public_data_path():
     """Sets global path to covid-data-public directory."""
@@ -48,9 +65,6 @@ class AggregationLevel(enum.Enum):
 
 
 class DatasetType(enum.Enum):
-
-    TIMESERIES = "timeseries"
-    LATEST = "latest"
     MULTI_REGION = "multiregion"
 
     @property
@@ -59,14 +73,10 @@ class DatasetType(enum.Enum):
         # Avoidling circular import errors.
         from libs.datasets import timeseries
 
-        from libs.datasets import latest_values_dataset
-
-        if self is DatasetType.TIMESERIES:
-            return timeseries.TimeseriesDataset
-        elif self is DatasetType.LATEST:
-            return latest_values_dataset.LatestValuesDataset
-        elif self is DatasetType.MULTI_REGION:
+        if self is DatasetType.MULTI_REGION:
             return timeseries.MultiRegionDataset
+        else:
+            raise ValueError("Bad enum")
 
 
 class DuplicateValuesForIndex(Exception):
@@ -253,6 +263,7 @@ def make_rows_key(
     on=None,
     after=None,
     before=None,
+    location_id_matches: Optional[str] = None,
     exclude_county_999: bool = False,
     exclude_fips_prefix: Optional[str] = None,
 ):
@@ -281,6 +292,11 @@ def make_rows_key(
         # create a binary Series here and refer to it from the query.
         not_county_999 = data[CommonFields.FIPS].str[-3:] != "999"
         query_parts.append("@not_county_999")
+    if location_id_matches:
+        location_id_match_mask = data.index.get_level_values(CommonFields.LOCATION_ID).str.match(
+            location_id_matches
+        )
+        query_parts.append("@location_id_match_mask")
     if exclude_fips_prefix:
         not_fips_prefix = data[CommonFields.FIPS].str[0:2] != exclude_fips_prefix
         query_parts.append("@not_fips_prefix")
@@ -307,9 +323,11 @@ def fips_index_geo_data(df: pd.DataFrame) -> pd.DataFrame:
     # Make a list of the GEO_DATA_COLUMNS in df, in GEO_DATA_COLUMNS order. The intersection method returns
     # values in a different order, which makes comparing the wide dates CSV harder.
     present_columns = [column for column in GEO_DATA_COLUMNS if column in df.columns]
+
     # The GEO_DATA_COLUMNS are expected to have a single value for each FIPS. Get the columns
     # from every row of each data source and then keep one of each unique row.
     all_identifiers = df.loc[:, present_columns].drop_duplicates()
+
     # Make a DataFrame with a unique FIPS index. If multiple rows are found with the same FIPS then there
     # are rows in the input data sources that have different values for county name, state etc.
     fips_indexed = all_identifiers.set_index(CommonFields.FIPS, verify_integrity=True)

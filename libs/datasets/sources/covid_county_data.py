@@ -1,3 +1,5 @@
+import dataclasses
+from functools import lru_cache
 from typing import Tuple
 
 import pandas as pd
@@ -5,9 +7,11 @@ import structlog
 
 from covidactnow.datapublic.common_fields import CommonFields
 from covidactnow.datapublic import common_df
+
 from libs.datasets import data_source
 from libs.datasets import dataset_utils
-from libs.datasets.timeseries import TimeseriesDataset
+from libs.datasets.dataset_utils import TIMESERIES_INDEX_FIELDS
+from libs.datasets.timeseries import MultiRegionDataset
 
 # 2020/11/01: By manual comparison of test positivity calculated via Covid County Data vs CMS
 # and local dashboards where available, these states have data that seems less credible than
@@ -19,13 +23,7 @@ class CovidCountyDataDataSource(data_source.DataSource):
     DATA_PATH = "data/cases-covid-county-data/timeseries-common.csv"
     SOURCE_NAME = "Valorum"
 
-    # Covid County Data reports values at both the state and county level. However, state values
-    # are not reported until complete values from states are received.  The latest
-    # row may contain some county data but not state data - instead of aggregating and returning
-    # incomplete state data, we are choosing to not aggregate.
-    FILL_MISSING_STATE_LEVEL_DATA = False
-
-    INDEX_FIELD_MAP = {f: f for f in TimeseriesDataset.INDEX_FIELDS}
+    INDEX_FIELD_MAP = {f: f for f in TIMESERIES_INDEX_FIELDS}
 
     # Keep in sync with update_covid_county_data.py in the covid-data-public repo.
     # DataSource objects must have a map from CommonFields to fields in the source file.
@@ -153,3 +151,20 @@ class CovidCountyDataDataSource(data_source.DataSource):
         data, provenance = cls.synthesize_test_metrics(data)
         # Column names are already CommonFields so don't need to rename
         return cls(data, provenance=provenance)
+
+    @lru_cache(None)
+    def multi_region_dataset(self) -> MultiRegionDataset:
+        dataset = super().multi_region_dataset()
+
+        # Add latest ICU_BEDS from timeseries to static.
+        # Hacked out of _timeseries_latest_values
+        # timeseries is already sorted by DATE with the latest at the bottom.
+        long = dataset.timeseries[CommonFields.ICU_BEDS].droplevel(CommonFields.DATE).dropna()
+        # `long` Index with LOCATION_ID. Keep only the last
+        # row with each index to get the last value for each date.
+        unduplicated_and_last_mask = ~long.index.duplicated(keep="last")
+        latest_icu_beds = long.loc[unduplicated_and_last_mask]
+        static_df = dataset.static.copy()
+        static_df.insert(len(static_df.columns), CommonFields.ICU_BEDS, latest_icu_beds)
+
+        return dataclasses.replace(dataset, static=static_df)

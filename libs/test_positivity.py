@@ -115,8 +115,10 @@ class PassThruMethod(Method):
 
 
 TEST_POSITIVITY_METHODS = (
-    # HACK: For now we assume TEST_POSITIVITY came from CMS and use that as the name that gets plumbed into provenance.
-    PassThruMethod("CMSTesting", CommonFields.TEST_POSITIVITY),
+    # HACK: For now we assume TEST_POSITIVITY_7D came from CDC numbers while
+    # TEST_POSITIVITY_14D came from CMS.
+    PassThruMethod("CDCTesting", CommonFields.TEST_POSITIVITY_7D),
+    PassThruMethod("CMSTesting", CommonFields.TEST_POSITIVITY_14D),
     DivisionMethod(
         "positiveTestsViral_totalTestsViral",
         CommonFields.POSITIVE_TESTS_VIRAL,
@@ -161,7 +163,7 @@ class AllMethods:
     ) -> "AllMethods":
         """Runs `methods` on `dataset_in` and returns the results or raises a TestPositivityException."""
         relevant_columns = AllMethods._list_columns(
-            AllMethods._methods_with_columns_available(methods, dataset_in.data.columns)
+            AllMethods._methods_with_columns_available(methods, dataset_in.timeseries.columns)
         )
         if not relevant_columns:
             raise NoMethodsWithRelevantColumns()
@@ -200,6 +202,7 @@ class AllMethods:
         test_positivity = timeseries.combined_datasets(
             calculated_dataset_recent_map,
             {CommonFields.TEST_POSITIVITY: list(calculated_dataset_map.keys())},
+            {},
         )
         # For debugging create a DataFrame with the calculated timeseries of all methods, including
         # timeseries that are not recent.
@@ -242,8 +245,5 @@ def run_and_maybe_join_columns(
     except TestPositivityException:
         log.exception("test_positivity failed")
         return mrts
-    else:
-        # We overwrite the test_positivity column if it exists.
-        return mrts.drop_column_if_present(CommonFields.TEST_POSITIVITY).join_columns(
-            test_positivity_results.test_positivity
-        )
+
+    return mrts.join_columns(test_positivity_results.test_positivity)

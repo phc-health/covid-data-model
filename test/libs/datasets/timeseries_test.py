@@ -44,51 +44,25 @@ def test_remove_padded_nans(include_na_at_end):
     pd.testing.assert_series_equal(results.cases, expected_series)
 
 
-def test_multi_region_to_from_timeseries():
-    ts = timeseries.TimeseriesDataset(
-        read_csv_and_index_fips_date(
-            "fips,county,aggregate_level,date,m1,m2\n"
-            "97111,Bar County,county,2020-04-02,2,\n"
-            "97222,Foo County,county,2020-04-01,,10\n"
-            "01,,state,2020-04-01,,20\n"
-        ).reset_index()
-    )
-    multiregion = timeseries.MultiRegionDataset.from_timeseries_and_latest(
-        ts, ts.latest_values_object()
-    )
-    pd.testing.assert_frame_equal(
-        ts.data,
-        multiregion.data_with_fips.drop(columns=[CommonFields.LOCATION_ID]),
-        check_like=True,
-    )
-
-    ts_again = multiregion.to_timeseries()
-    pd.testing.assert_frame_equal(
-        ts.data, ts_again.data.drop(columns=[CommonFields.LOCATION_ID]), check_like=True
-    )
-
-
 def test_multi_region_to_from_timeseries_and_latest_values(tmp_path: pathlib.Path):
-    ts = timeseries.TimeseriesDataset(
-        read_csv_and_index_fips_date(
-            "fips,county,aggregate_level,date,m1,m2\n"
-            "97111,Bar County,county,2020-04-02,2,\n"
-            "97222,Foo County,county,2020-04-01,,10\n"
-            "01,,state,2020-04-01,,20\n"
-        ).reset_index()
-    )
-    latest_values = timeseries.LatestValuesDataset(
-        read_csv_and_index_fips(
-            "fips,county,aggregate_level,c1,c2\n"
-            "97111,Bar County,county,3,\n"
-            "97222,Foo County,county,4,10.5\n"
-            "01,,state,,123.4\n"
-        ).reset_index()
-    )
-    multiregion = timeseries.MultiRegionDataset.from_timeseries_and_latest(
-        ts, latest_values
-    ).add_provenance_csv(
-        io.StringIO("location_id,variable,provenance\n" "iso1:us#fips:97111,m1,ts197111prov\n")
+    ts_df = read_csv_and_index_fips_date(
+        "fips,county,aggregate_level,date,m1,m2\n"
+        "97111,Bar County,county,2020-04-02,2,\n"
+        "97222,Foo County,county,2020-04-01,,10\n"
+        "01,,state,2020-04-01,,20\n"
+    ).reset_index()
+    latest_values_df = read_csv_and_index_fips(
+        "fips,county,aggregate_level,c1,c2\n"
+        "97111,Bar County,county,3,\n"
+        "97222,Foo County,county,4,10.5\n"
+        "01,,state,,123.4\n"
+    ).reset_index()
+    multiregion = (
+        timeseries.MultiRegionDataset.from_fips_timeseries_df(ts_df)
+        .add_fips_static_df(latest_values_df)
+        .add_provenance_csv(
+            io.StringIO("location_id,variable,provenance\n" "iso1:us#fips:97111,m1,ts197111prov\n")
+        )
     )
     region_97111 = multiregion.get_one_region(Region.from_fips("97111"))
     assert region_97111.date_indexed.at["2020-04-02", "m1"] == 2
@@ -109,31 +83,29 @@ def test_multi_region_to_from_timeseries_and_latest_values(tmp_path: pathlib.Pat
 
 
 def test_multi_region_to_csv_write_timeseries_latest_values(tmp_path: pathlib.Path):
-    ts = timeseries.TimeseriesDataset(
-        read_csv_and_index_fips_date(
-            "fips,county,aggregate_level,date,m1,m2\n"
-            "97111,Bar County,county,2020-04-02,2,\n"
-            "97222,Foo County,county,2020-04-01,,10\n"
-            "01,,state,2020-04-01,,20\n"
-        ).reset_index()
-    )
-    latest_values = timeseries.LatestValuesDataset(
-        read_csv_and_index_fips(
-            "fips,county,aggregate_level,c1,m2\n"
-            "97111,Bar County,county,3,\n"
-            "97222,Foo County,county,4,10.5\n"
-            "01,,state,,123.4\n"
-        ).reset_index()
-    )
-    multiregion = timeseries.MultiRegionDataset.from_timeseries_and_latest(
-        ts, latest_values
-    ).add_provenance_csv(
-        io.StringIO("location_id,variable,provenance\n" "iso1:us#fips:97111,m1,ts197111prov\n")
+    ts = read_csv_and_index_fips_date(
+        "fips,county,aggregate_level,date,m1,m2\n"
+        "97111,Bar County,county,2020-04-02,2,\n"
+        "97222,Foo County,county,2020-04-01,,10\n"
+        "01,,state,2020-04-01,,20\n"
+    ).reset_index()
+    latest_values = read_csv_and_index_fips(
+        "fips,county,aggregate_level,c1,m2\n"
+        "97111,Bar County,county,3,\n"
+        "97222,Foo County,county,4,10.5\n"
+        "01,,state,,123.4\n"
+    ).reset_index()
+    multiregion = (
+        timeseries.MultiRegionDataset.from_fips_timeseries_df(ts)
+        .add_fips_static_df(latest_values)
+        .add_provenance_csv(
+            io.StringIO("location_id,variable,provenance\n" "iso1:us#fips:97111,m1,ts197111prov\n")
+        )
     )
 
     csv_path = tmp_path / "multiregion.csv"
     # Check that latest values are correctly derived from timeseries and merged with
-    # LatestValuesDataset.
+    # the static data.
     multiregion.to_csv(csv_path, write_timeseries_latest_values=True)
     assert csv_path.read_text() == (
         "location_id,date,fips,county,aggregate_level,c1,m1,m2\n"
@@ -183,8 +155,8 @@ def test_multi_region_get_counties():
             "iso1:us#fips:97,Great State,state,,1,2\n"
         )
     )
-    counties_ts = ts.get_counties(after=pd.to_datetime("2020-04-01"))
-    assert to_dict(["location_id", "date"], counties_ts.data[["location_id", "date", "m1"]]) == {
+    counties_ts = ts.get_counties(after=pd.to_datetime("2020-04-01")).timeseries.reset_index()
+    assert to_dict(["location_id", "date"], counties_ts[["location_id", "date", "m1"]]) == {
         ("iso1:us#fips:97111", pd.to_datetime("2020-04-02")): {"m1": 2},
         ("iso1:us#fips:97111", pd.to_datetime("2020-04-03")): {"m1": 3},
     }
@@ -253,7 +225,7 @@ def test_multiregion_provenance():
         "97222,Foo County,county,2020-04-01,,10\n"
         "97222,Foo County,county,2020-04-03,3,30\n"
         "03,,state,2020-04-03,4,40\n"
-    )
+    ).reset_index()
     provenance = combined_datasets.provenance_wide_metrics_to_series(
         read_csv_and_index_fips_date(
             "fips,date,m1,m2\n"
@@ -265,8 +237,9 @@ def test_multiregion_provenance():
         ),
         structlog.get_logger(),
     )
-    ts = timeseries.TimeseriesDataset(input_df.reset_index(), provenance=provenance)
-    out = timeseries.MultiRegionDataset.from_timeseries_and_latest(ts, ts.latest_values_object())
+    out = timeseries.MultiRegionDataset.from_fips_timeseries_df(input_df).add_fips_provenance(
+        provenance
+    )
     # Use loc[...].at[...] as work-around for https://github.com/pandas-dev/pandas/issues/26989
     assert out.provenance.loc["iso1:us#fips:97111"].at["m1"] == "src11"
     assert out.get_one_region(Region.from_fips("97111")).provenance["m1"] == "src11"
@@ -297,7 +270,7 @@ def _latest_sorted_by_location_date(
     ts: timeseries.MultiRegionDataset, drop_na: bool
 ) -> pd.DataFrame:
     """Returns the latest data, sorted by LOCATION_ID."""
-    df = ts._static_and_timeseries_latest_with_fips().sort_values(
+    df = ts.static_and_timeseries_latest_with_fips().sort_values(
         [CommonFields.LOCATION_ID], ignore_index=True
     )
     if drop_na:
@@ -318,7 +291,11 @@ def assert_dataset_like(
     latest1 = _latest_sorted_by_location_date(ds1, drop_na_latest)
     latest2 = _latest_sorted_by_location_date(ds2, drop_na_latest)
     pd.testing.assert_frame_equal(latest1, latest2, check_like=True, check_dtype=False)
-    pd.testing.assert_series_equal(ds1.provenance, ds2.provenance)
+    # Somehow test/libs/datasets/combined_dataset_utils_test.py::test_update_and_load has
+    # two provenance Series that are empty but assert_series_equal fails with message
+    # 'Attribute "inferred_type" are different'. Don't call it when both series are empty.
+    if not (ds1.provenance.empty and ds2.provenance.empty):
+        pd.testing.assert_series_equal(ds1.provenance, ds2.provenance)
 
 
 def test_append_regions():
@@ -449,6 +426,31 @@ def test_new_cases_remove_negative():
             "iso1:us#fips:1,2020-01-02,50,\n"
             "iso1:us#fips:1,2020-01-03,75,25\n"
             "iso1:us#fips:1,,75,25.0\n"
+        )
+    )
+
+    timeseries_after = timeseries.add_new_cases(mrts_before)
+    assert_dataset_like(mrts_expected, timeseries_after)
+
+
+def test_new_cases_gap_in_date():
+    mrts_before = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,date,cases\n"
+            "iso1:us#fips:1,2020-01-01,100\n"
+            "iso1:us#fips:1,2020-01-02,\n"
+            "iso1:us#fips:1,2020-01-03,110\n"
+            "iso1:us#fips:1,2020-01-04,130\n"
+        )
+    )
+
+    mrts_expected = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,date,cases,new_cases\n"
+            "iso1:us#fips:1,2020-01-01,100,100\n"
+            "iso1:us#fips:1,2020-01-02,,\n"
+            "iso1:us#fips:1,2020-01-03,110,\n"
+            "iso1:us#fips:1,2020-01-04,130,20\n"
         )
     )
 
@@ -889,15 +891,10 @@ def test_not_removing_short_series():
     assert_dataset_like(dataset, result)
 
 
-def test_timeseries_empty_timeseries_and_latest():
-    # Check that empty TimeseriesDataset and LatestValuesDataset create a MultiRegionDataset
+def test_timeseries_empty_timeseries_and_static():
+    # Check that empty dataset creates a MultiRegionDataset
     # and that get_one_region raises expected exception.
-    ts = timeseries.TimeseriesDataset(
-        pd.DataFrame([], columns=[CommonFields.FIPS, CommonFields.DATE])
-    )
-    dataset = timeseries.MultiRegionDataset.from_timeseries_and_latest(
-        ts, ts.latest_values_object()
-    )
+    dataset = timeseries.MultiRegionDataset.new_without_timeseries()
     with pytest.raises(timeseries.RegionLatestNotFound):
         dataset.get_one_region(Region.from_fips("01001"))
 
@@ -950,7 +947,7 @@ def test_aggregate_states_to_country():
     assert_dataset_like(country, expected)
 
 
-def test_combined():
+def test_combined_timeseries():
     ts1 = timeseries.MultiRegionDataset.from_csv(
         io.StringIO(
             "location_id,date,county,aggregate_level,m1\n"
@@ -975,7 +972,8 @@ def test_combined():
     )
     combined = timeseries.combined_datasets(
         {DatasetName("ts1"): ts1, DatasetName("ts2"): ts2},
-        {"m1": [DatasetName("ts1"), DatasetName("ts2")]},
+        {FieldName("m1"): [DatasetName("ts1"), DatasetName("ts2")]},
+        {},
     )
     expected = timeseries.MultiRegionDataset.from_csv(
         io.StringIO(
@@ -1014,7 +1012,7 @@ def test_combined_missing_field():
     field_source_map = {FieldName("m1"): list(dataset_map.keys())}
 
     # Check that combining finishes and produces the expected result.
-    combined_1 = timeseries.combined_datasets(dataset_map, field_source_map)
+    combined_1 = timeseries.combined_datasets(dataset_map, field_source_map, {})
     expected = timeseries.MultiRegionDataset.from_csv(
         io.StringIO(
             "location_id,date,m1\n"
@@ -1029,8 +1027,36 @@ def test_combined_missing_field():
     combined_2 = timeseries.combined_datasets(
         dataset_map,
         {name: reversed(source_list) for name, source_list in field_source_map.items()},
+        {},
     )
     assert_dataset_like(expected, combined_2)
+
+
+def test_combined_static():
+    ds1 = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,date,county,aggregate_level,s1\n"
+            "iso1:us#cbsa:10100,,,,\n"
+            "iso1:us#fips:97222,,Foo County,county,22\n"
+        )
+    )
+    ds2 = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,date,county,aggregate_level,s1\n"
+            "iso1:us#cbsa:10100,,,,111\n"
+            "iso1:us#fips:97222,,Foo County,county,222\n"
+        )
+    )
+    combined = timeseries.combined_datasets(
+        {DatasetName("ds1"): ds1, DatasetName("ds2"): ds2},
+        {},
+        {FieldName("s1"): [DatasetName("ds1"), DatasetName("ds2")]},
+    )
+    expected = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO("location_id,date,s1\n" "iso1:us#cbsa:10100,,111\n" "iso1:us#fips:97222,,22\n")
+    )
+
+    assert_dataset_like(expected, combined, drop_na_timeseries=True)
 
 
 def test_aggregate_states_to_country_scale():
@@ -1050,7 +1076,7 @@ def test_aggregate_states_to_country_scale():
         ts,
         {Region.from_state("AZ"): region_us, Region.from_state("TX"): region_us},
         AggregationLevel.COUNTRY,
-        [timeseries.StaticWeightedAverageAggregation("m1", CommonFields.POPULATION),],
+        [timeseries.StaticWeightedAverageAggregation(FieldName("m1"), CommonFields.POPULATION),],
     )
     # The column m1 is scaled by population.
     # On 2020-04-01: 4 * 0.25 + 8 * 0.75 = 7
@@ -1096,3 +1122,84 @@ def test_aggregate_states_to_country_scale_static():
         )
     )
     assert_dataset_like(country, expected)
+
+
+def test_timeseries_rows():
+    ts = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,county,aggregate_level,date,m1,m2,population\n"
+            "iso1:us#iso2:us-tx,Texas,state,2020-04-01,4,2,\n"
+            "iso1:us#iso2:us-tx,Texas,state,2020-04-02,4,4,\n"
+            "iso1:us#iso2:us-tx,Texas,state,,,,2500\n"
+            "iso1:us#iso2:us-az,Arizona,state,2020-04-01,8,20,\n"
+            "iso1:us#iso2:us-az,Arizona,state,2020-04-02,12,40,\n"
+            "iso1:us#iso2:us-az,Arizona,state,,,,7500\n"
+        )
+    )
+
+    rows = ts.timeseries_rows()
+    expected = pd.read_csv(
+        io.StringIO(
+            "location_id,variable,provenance,2020-04-01,2020-04-02\n"
+            "iso1:us#iso2:us-az,m1,,8,12\n"
+            "iso1:us#iso2:us-az,m2,,20,40\n"
+            "iso1:us#iso2:us-tx,m1,,4,4\n"
+            "iso1:us#iso2:us-tx,m2,,2,4\n"
+        )
+    ).set_index([CommonFields.LOCATION_ID, PdFields.VARIABLE])
+    pd.testing.assert_frame_equal(rows, expected, check_dtype=False, check_exact=False)
+
+
+def test_multi_region_dataset_get_subset():
+    ds = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,aggregate_level,state,fips,date,m1,m2,population\n"
+            "iso1:us,country,,,2020-04-01,100,200,\n"
+            "iso1:us,country,,,,,,10000\n"
+            "iso1:us#iso2:us-tx,state,TX,,2020-04-01,4,2,\n"
+            "iso1:us#iso2:us-tx,state,TX,,,,,5000\n"
+            "iso1:us#fips:97222,county,,97222,2020-04-01,1,2,\n"
+            "iso1:us#fips:97222,county,,97222,,,,1000\n"
+            "iso1:us#cbsa:10100,cbsa,,,2020-04-01,1,2,20000\n"
+        )
+    )
+
+    subset = ds.get_subset(aggregation_level=AggregationLevel.COUNTRY)
+    assert subset.static.at["iso1:us", CommonFields.POPULATION] == 10000
+
+    subset = ds.get_subset(fips="97222")
+    assert subset.timeseries.at[("iso1:us#fips:97222", "2020-04-01"), "m2"] == 2
+
+    subset = ds.get_subset(state="TX")
+    assert subset.static.at["iso1:us#iso2:us-tx", CommonFields.POPULATION] == 5000
+
+    subset = ds.get_subset(states=["TX"])
+    assert subset.static.at["iso1:us#iso2:us-tx", CommonFields.POPULATION] == 5000
+
+    subset = ds.get_subset(location_id_matches=r"\A(iso1\:us|iso1\:us\#cbsa.+)\Z")
+    assert {r.location_id for r, _ in subset.iter_one_regions()} == {
+        "iso1:us",
+        "iso1:us#cbsa:10100",
+    }
+
+
+@pytest.mark.skip(reason="test not written, needs proper columns")
+def test_calculate_puerto_rico_bed_occupancy_rate():
+    ds = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,county,aggregate_level,date,population\n"
+            "iso1:us#iso2:us-pr,Texas,state,2020-04-01,4,,\n"
+            "iso1:us#iso2:us-pr,Texas,state,,,4,2500\n"
+        )
+    )
+
+    actual = timeseries.aggregate_puerto_rico_from_counties(ds)
+
+    expected = timeseries.MultiRegionDataset.from_csv(
+        io.StringIO(
+            "location_id,aggregate_level,date,m1,s1,population\n"
+            "iso1:us,country,2020-04-01,7,,\n"
+            "iso1:us,country,,,10,10000\n"
+        )
+    )
+    assert_dataset_like(actual, expected)

@@ -7,6 +7,13 @@ description: Updates to the Covid Act Now API.
 
 Updates to the API will be reflected here.
 
+
+### Link to Covid Act Now website
+_Added on 2020-12-03_
+
+Each region now includes a field `url` that points to the Covid Act Now location page
+for that region.
+
 ### Upcoming risk level update
 _Added on 2020-12-01_
 
@@ -69,12 +76,12 @@ _Added on 2020-10-29_
 
 In addition to cumulative case counts, we added a `New Cases` field to all
 `actuals` and `actualsTimeseries` values.  The `New Cases` field computes new
-cases and applies outlier detection to remove erratic case values.  
+cases and applies outlier detection to remove erratic case values.
 
 ### Add `locationId` field
 _Added on 2020-10-27_
 
-Adds a generic location ID used to represent regions.  Will allow for 
+Adds a generic location ID used to represent regions.  Will allow for
 greater flexibility as we add more aggregation levels (such as country).
 
 ### Add `riskLevels`

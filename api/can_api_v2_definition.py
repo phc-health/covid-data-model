@@ -12,6 +12,7 @@ class TestPositivityRatioMethod(GetByValueMixin, enum.Enum):
     """Method used to determine test positivity ratio."""
 
     CMSTesting = "CMSTesting"
+    CDCTesting = "CDCTesting"
     HHSTesting = "HHSTesting"
     VALORUM = "Valorum"
     COVID_TRACKING = "covid_tracking"
@@ -176,6 +177,7 @@ class RiskLevel(enum.Enum):
  *High* - At risk of outbreak
  *Critical* - Active or imminent outbreak
  *Unknown* - Risk unknown
+ *Extreme* - Severe outbreak
 """
 
     LOW = 0
@@ -187,6 +189,8 @@ class RiskLevel(enum.Enum):
     CRITICAL = 3
 
     UNKNOWN = 4
+
+    EXTREME = 5
 
 
 class RiskLevels(base_model.APIBaseModel):
@@ -240,12 +244,15 @@ class RegionSummary(base_model.APIBaseModel):
     population: int = pydantic.Field(
         ..., description="Total Population in geographic region.", gt=0
     )
-
     metrics: Metrics = pydantic.Field(...)
     riskLevels: RiskLevels = pydantic.Field(..., description="Risk levels for region.")
     actuals: Actuals = pydantic.Field(...)
 
     lastUpdatedDate: datetime.date = pydantic.Field(..., description="Date of latest data")
+
+    url: Optional[str] = pydantic.Field(
+        ..., description="URL linking to Covid Act Now location page."
+    )
 
 
 class RegionSummaryWithTimeseries(RegionSummary):
