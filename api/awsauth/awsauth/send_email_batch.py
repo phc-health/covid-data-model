@@ -26,8 +26,8 @@ def _load_emails(path: pathlib.Path):
             yield row["email"]
 
 
-def _build_email(to_email: str) -> ses_client.EmailData:
-    email_html = RISK_LEVEL_UPDATE_PATH.read_text()
+def _build_email(to_email: str, email_html_path: pathlib.Path) -> ses_client.EmailData:
+    email_html = email_html_path.read_text()
 
     return ses_client.EmailData(
         subject="Change in NYC Data Aggregation",
@@ -43,15 +43,16 @@ def _build_email(to_email: str) -> ses_client.EmailData:
 @click.argument("email-list-path", type=pathlib.Path)
 @click.argument("email-path", type=pathlib.Path)
 def send_emails(
-    emails_list_path: pathlib.Path, email_path: pathlib.Path
+    email_list_path: pathlib.Path, email_path: pathlib.Path
 ):  # pylint: disable=no-value-for-parameter
 
     auth_app.init()
 
-    emails = _load_emails(emails_path)
+    emails = _load_emails(email_list_path)
 
     for email in emails:
-        risk_email = _build_email(email)
+        print(email)
+        risk_email = _build_email(email, email_path)
 
         email_send_result = EmailRepo.send_email(risk_email)
         if not email_send_result:
