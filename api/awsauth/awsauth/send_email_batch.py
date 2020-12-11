@@ -15,7 +15,7 @@ from awsauth.email_repo import EmailRepo
 _logger = structlog.get_logger()
 
 
-RISK_LEVEL_UPDATE_PATH = pathlib.Path(__file__).parent / "risk_level_update_email.html"
+RISK_LEVEL_UPDATE_PATH = pathlib.Path(__file__).parent / "nyc_2_0_announcement.html"
 
 
 def _load_emails(path: pathlib.Path):
@@ -30,18 +30,21 @@ def _build_email(to_email: str) -> ses_client.EmailData:
     email_html = RISK_LEVEL_UPDATE_PATH.read_text()
 
     return ses_client.EmailData(
-        subject="[TEST] Update to risk levels",
+        subject="Change in NYC Data Aggregation",
         from_email="Covid Act Now API <api@covidactnow.org>",
         reply_to="api@covidactnow.org",
         to_email=to_email,
         html=email_html,
-        configuration_set="api-risk-level-update-emails-booo",
+        configuration_set="api-risk-level-update-emails",
     )
 
 
 @click.command()
-@click.argument("emails-path", type=pathlib.Path)
-def send_emails(emails_path: pathlib.Path):  # pylint: disable=no-value-for-parameter
+@click.argument("email-list-path", type=pathlib.Path)
+@click.argument("email-path", type=pathlib.Path)
+def send_emails(
+    emails_list_path: pathlib.Path, email_path: pathlib.Path
+):  # pylint: disable=no-value-for-parameter
 
     auth_app.init()
 

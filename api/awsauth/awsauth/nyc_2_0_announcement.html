@@ -1,0 +1,61 @@
+<html>
+  <head></head>
+  <body>
+    <p>Hello CovidActNow API users,</p>
+
+    <p></p>
+
+    <p>
+      We are reaching out to let you know about an upcoming change to how data
+      for New York City is represented in our API.
+    </p>
+
+    <p>
+      Historically, we’ve represented data for NYC in such a way that each of
+      the 5 counties returned the data for the entire city - with no way to get
+      data for an individual county. Going forward, each county will return data
+      for just that county.
+    </p>
+
+    <p>
+      At the same time, we have recently
+      <a href="https://apidocs.covidactnow.org/api#tag/CBSA-Data">
+        added support for CBSAs
+      </a>
+      to our API.
+    </p>
+
+    <p>
+      CBSAs represent collections of counties that are socioeconomically linked.
+      They are used to represent metropolitan and micropolitan areas.
+    </p>
+
+    <p>
+      For those interested in the aggregate data for the New York Metro Area, it
+      is available here:
+    </p>
+
+    <p>
+      <a
+        href="https://api.covidactnow.org/v2/cbsa/35620.json?apiKey=YOUR_API_KEY"
+        >https://api.covidactnow.org/v2/cbsa/35620.json?apiKey=YOUR_API_KEY</a
+      >
+    </p>
+
+    <p>
+      (Note that the metro area is broader than the bounds of New York City).
+    </p>
+
+    <p>
+      We are planning on making the change to the API early next week but please
+      let us know if this is going to impact your use of the API adversely and
+      we can adjust that timing.
+    </p>
+
+    <p>
+      Best,
+      <br />
+      The Covid Act Now Team
+    </p>
+  </body>
+</html>
