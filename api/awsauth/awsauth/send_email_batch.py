@@ -31,7 +31,7 @@ def _build_email(to_email: str, email_html_path: pathlib.Path) -> ses_client.Ema
 
     return ses_client.EmailData(
         subject="Change in NYC Data Aggregation",
-        from_email="Covid Act Now API <api@covidactnow.org>",
+        from_email="CovidActNow API <api@covidactnow.org>",
         reply_to="api@covidactnow.org",
         to_email=to_email,
         html=email_html,

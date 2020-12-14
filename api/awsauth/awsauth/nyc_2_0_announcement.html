@@ -11,10 +11,12 @@
     </p>
 
     <p>
-      Historically, we’ve represented data for NYC in such a way that each of
-      the 5 counties returned the data for the entire city - with no way to get
-      data for an individual county. Going forward, each county will return data
-      for just that county.
+      Historically, we’ve represented data for NYC in such a way that all data
+      from the 5 counties of New York City were aggregated into the New York County (fips: 36061). Queries for the other 4 counties (Kings, Queens, Bronx, and Richmond) would return a 404. 
+    </p>
+
+    <p>
+      Going forward, we are removing the aggregation of all NYC county data into one county - API data will exist for each of the 5 NYC counties.
     </p>
 
     <p>
@@ -47,9 +49,11 @@
     </p>
 
     <p>
-      We are planning on making the change to the API early next week but please
-      let us know if this is going to impact your use of the API adversely and
-      we can adjust that timing.
+      <strong
+        >We are planning on making the change to the API mid next week</strong
+      >
+      but please let us know if this is going to impact your use of the API
+      adversely and we can adjust that timing.
     </p>
 
     <p>
