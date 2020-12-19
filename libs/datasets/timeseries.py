@@ -1246,8 +1246,8 @@ class AnnotationField(GetByValueMixin, ValueAsStrMixin, FieldName, enum.Enum):
 
 @enum.unique
 class AnnotationType(GetByValueMixin, ValueAsStrMixin, enum.Enum):
-    CUMULATIVE_TAIL_TRUNCATED = "cumulative_tail_truncated"
-    CUMULATIVE_LONG_TAIL_TRUNCATED = "cumulative_long_tail_truncated"
+    TAIL_TRUNCATED = "tail_truncated"
+    LONG_TAIL_TRUNCATED = "long_tail_truncated"
 
 
 @dataclass
@@ -1273,19 +1273,33 @@ class TailFilter:
 
     @staticmethod
     def run(
-        dataset: MultiRegionDataset, fields: List[FieldName]
+        dataset: MultiRegionDataset,
+        cumulative_fields: List[FieldName],
+        current_fields: List[FieldName],
     ) -> Tuple["TailFilter", MultiRegionDataset]:
         """Returns a dataset with recent data that looks bad removed from cumulative fields."""
         timeseries_wide_dates = dataset.timeseries_wide_dates()
 
-        fields_mask = timeseries_wide_dates.index.get_level_values(PdFields.VARIABLE).isin(fields)
-        to_filter = timeseries_wide_dates.loc[pd.IndexSlice[:, fields_mask], :]
+        level_values = timeseries_wide_dates.index.get_level_values(PdFields.VARIABLE)
+        cumulative_fields_mask = level_values.isin(cumulative_fields)
+        current_fields_mask = level_values.isin(current_fields)
+
+        to_filter_cumulative = timeseries_wide_dates.loc[
+            pd.IndexSlice[:, cumulative_fields_mask], :
+        ]
+        to_filter_current = timeseries_wide_dates.loc[pd.IndexSlice[:, current_fields_mask], :]
+        fields_mask = cumulative_fields_mask | current_fields_mask
         not_filtered = timeseries_wide_dates.loc[pd.IndexSlice[:, ~fields_mask], :]
 
         tail_filter = TailFilter()
-        filtered = to_filter.apply(tail_filter._filter_one_series, axis=1)
+        filtered_current = to_filter_cumulative.apply(
+            lambda x: tail_filter._filter_one_series(x, is_cumulative=False), axis=1
+        )
+        filtered_cumulative = to_filter_current.apply(
+            lambda x: tail_filter._filter_one_series(x, is_cumulative=False), axis=1
+        )
 
-        merged = pd.concat([not_filtered, filtered])
+        merged = pd.concat([not_filtered, filtered_current, filtered_cumulative])
         timeseries_wide_variables = merged.stack().unstack(PdFields.VARIABLE).sort_index()
 
         return tail_filter, dataclasses.replace(dataset, timeseries=timeseries_wide_variables)
@@ -1293,7 +1307,7 @@ class TailFilter:
     def annotations_as_dataframe(self):
         return pd.DataFrame(self.annotations)
 
-    def _filter_one_series(self, series_in: pd.Series) -> pd.Series:
+    def _filter_one_series(self, series_in: pd.Series, is_cumulative: bool = True) -> pd.Series:
         """Filters one timeseries of cumulative values. This is a method so self can be used to
         store side outputs.
 
@@ -1304,7 +1318,10 @@ class TailFilter:
             self.skipped_too_short += 1
             return series_in
 
-        diff = series_in.diff()
+        if is_cumulative:
+            diff = series_in.diff()
+        else:
+            diff = series_in
         mean = diff.iloc[
             TailFilter.TRUSTED_DATES_OLDEST : TailFilter.TRUSTED_DATES_NEWEST + 1
         ].mean()
@@ -1339,10 +1356,10 @@ class TailFilter:
             # series_in.iat[truncate_at] is the first value *not* returned
             assert TailFilter.FILTER_DATES_OLDEST <= truncate_at <= -1
             if count_observation_diff_under_threshold < TailFilter.COUNT_OBSERVATION_LONG:
-                annotation_type = AnnotationType.CUMULATIVE_TAIL_TRUNCATED
+                annotation_type = AnnotationType.TAIL_TRUNCATED
                 self.truncated += 1
             else:
-                annotation_type = AnnotationType.CUMULATIVE_LONG_TAIL_TRUNCATED
+                annotation_type = AnnotationType.LONG_TAIL_TRUNCATED
                 self.long_truncated += 1
             # Currently one annotation is created per series. Maybe it makes more sense to add
             # one for each dropped observation / real value?

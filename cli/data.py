@@ -106,7 +106,7 @@ def update(
     )
     # Filter for stalled cumulative values before deriving NEW_CASES from CASES.
     tail_filter, multiregion_dataset = timeseries.TailFilter.run(
-        multiregion_dataset, CUMULATIVE_FIELDS_TO_FILTER + CURRENT_FIELDS_TO_FILTER
+        multiregion_dataset, CUMULATIVE_FIELDS_TO_FILTER, CURRENT_FIELDS_TO_FILTER
     )
     multiregion_dataset = timeseries.add_new_cases(multiregion_dataset)
     multiregion_dataset = timeseries.drop_new_case_outliers(multiregion_dataset)
@@ -204,12 +204,14 @@ def run_population_filter(output_path: pathlib.Path):
 
 @main.command()
 @click.argument("output_path", type=pathlib.Path)
-def run_bad_tails_filter(output_path: pathlib.Path):
-    us_dataset = combined_datasets.load_us_timeseries_dataset()
+@click.option("--state", type=str, help="For testing, a two letter state abbr")
+def run_bad_tails_filter(output_path: pathlib.Path, state: str):
+    us_dataset = combined_datasets.load_us_timeseries_dataset().get_subset(state=state)
+
     log = structlog.get_logger()
     log.info("Starting filter")
     tail_filter, dataset_out = timeseries.TailFilter.run(
-        us_dataset, CUMULATIVE_FIELDS_TO_FILTER + CURRENT_FIELDS_TO_FILTER
+        us_dataset, CUMULATIVE_FIELDS_TO_FILTER, CURRENT_FIELDS_TO_FILTER
     )
     log.info("Writing output")
     wide_dates_df.write_csv(dataset_out.timeseries_rows(), output_path)
