@@ -908,17 +908,38 @@
           },
           "vaccinesDistributed": {
             "title": "Vaccinesdistributed",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Number of vaccine doses distributed."
           },
           "vaccinationsInitiated": {
             "title": "Vaccinationsinitiated",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "\nNumber of vaccinations initiated.\n\nThis value may vary by type of vaccine, but for Moderna and Pfizer, this indicates\nnumber of people vaccinated with the first dose.\n"
           },
           "vaccinationsCompleted": {
             "title": "Vaccinationscompleted",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "\nNumber of vaccinations completed.\n\nThis value may vary by type of vaccine, but for Moderna and Pfizer, this indicates\nnumber of people vaccinated with the both first and second dose.\n"
           }
         },
@@ -1036,7 +1057,14 @@
             "description": "Ratio of people who test positive calculated using a 7-day rolling average."
           },
           "testPositivityRatioDetails": {
-            "$ref": "#/components/schemas/TestPositivityRatioDetails"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestPositivityRatioDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "caseDensity": {
             "title": "Casedensity",
@@ -1098,7 +1126,14 @@
             ]
           },
           "icuHeadroomDetails": {
-            "$ref": "#/components/schemas/ICUHeadroomMetricDetails"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ICUHeadroomMetricDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "icuCapacityRatio": {
             "title": "Icucapacityratio",
@@ -1201,12 +1236,26 @@
           },
           "lat": {
             "title": "Lat",
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Latitude of point within the state or county"
           },
           "long": {
             "title": "Long",
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Longitude of point within the state or county"
           },
           "locationId": {
@@ -1503,7 +1552,14 @@
             "description": "Ratio of people who test positive calculated using a 7-day rolling average."
           },
           "testPositivityRatioDetails": {
-            "$ref": "#/components/schemas/TestPositivityRatioDetails"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestPositivityRatioDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "caseDensity": {
             "title": "Casedensity",
@@ -1565,7 +1621,14 @@
             ]
           },
           "icuHeadroomDetails": {
-            "$ref": "#/components/schemas/ICUHeadroomMetricDetails"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ICUHeadroomMetricDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "icuCapacityRatio": {
             "title": "Icucapacityratio",
@@ -1694,17 +1757,38 @@
           },
           "vaccinesDistributed": {
             "title": "Vaccinesdistributed",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Number of vaccine doses distributed."
           },
           "vaccinationsInitiated": {
             "title": "Vaccinationsinitiated",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "\nNumber of vaccinations initiated.\n\nThis value may vary by type of vaccine, but for Moderna and Pfizer, this indicates\nnumber of people vaccinated with the first dose.\n"
           },
           "vaccinationsCompleted": {
             "title": "Vaccinationscompleted",
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "\nNumber of vaccinations completed.\n\nThis value may vary by type of vaccine, but for Moderna and Pfizer, this indicates\nnumber of people vaccinated with the both first and second dose.\n"
           },
           "date": {
@@ -1875,7 +1959,14 @@
           },
           "metricsTimeseries": {
             "title": "Metricstimeseries",
-            "type": "array",
+            "anyOf": [
+              {
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "items": {
               "$ref": "#/components/schemas/MetricsTimeseriesRow"
             }
