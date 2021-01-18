@@ -13,8 +13,6 @@ class NYTimesDataset(data_source.DataSource):
 
     DATA_PATH = "data/cases-nytimes/timeseries-common.csv"
 
-    HAS_AGGREGATED_NYC_BOROUGH = True
-
     INDEX_FIELD_MAP = {f: f for f in TIMESERIES_INDEX_FIELDS}
 
     COMMON_FIELD_MAP = {f: f for f in {CommonFields.CASES, CommonFields.DEATHS,}}

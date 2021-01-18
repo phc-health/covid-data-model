@@ -1,33 +1,38 @@
 from typing import Type, Optional
-
+import dataclasses
+import structlog
 import pandas as pd
-
+from covidactnow.datapublic.common_fields import CommonFields
 from libs.datasets.dataset_utils import STATIC_INDEX_FIELDS
 from libs.datasets.dataset_utils import TIMESERIES_INDEX_FIELDS
 from libs.datasets.timeseries import MultiRegionDataset
 from functools import lru_cache
 
 
-class DataSource(object):
+_logger = structlog.get_logger()
+
+
+@dataclasses.dataclass
+class DataSource:
     """Represents a single dataset source, loads data and cleans data."""
+
+    data: pd.DataFrame
+    provenance: str
 
     # Subclass must implement custom class of fields in dataset.
     class Fields(object):
         pass
 
-    INDEX_FIELD_MAP = None
+    DATA_PATH = None
 
     COMMON_FIELD_MAP = None
 
     # Name of dataset source
     SOURCE_NAME = None
 
-    # Indicates if NYC data is aggregated into one NYC county or not.
-    HAS_AGGREGATED_NYC_BOROUGH = False
-
-    def __init__(self, data: pd.DataFrame, provenance: Optional[pd.Series] = None):
-        self.data = data
-        self.provenance = provenance
+    @classmethod
+    def load(cls) -> "DataSource":
+        pass
 
     @classmethod
     def local(cls) -> "DataSource":
@@ -39,7 +44,7 @@ class DataSource(object):
 
     @lru_cache(None)
     def multi_region_dataset(self) -> MultiRegionDataset:
-        if set(self.INDEX_FIELD_MAP.keys()) == set(TIMESERIES_INDEX_FIELDS):
+        if CommonFields.DATE in self.data.columns:
             dataset = MultiRegionDataset.from_fips_timeseries_df(self.data).add_provenance_all(
                 self.SOURCE_NAME
             )
@@ -49,11 +54,14 @@ class DataSource(object):
             # if self.provenance is not None:
             #     dataset.add_fips_provenance(self.provenance)
             return dataset
-
-        if set(self.INDEX_FIELD_MAP.keys()) == set(STATIC_INDEX_FIELDS):
+        else:
             return MultiRegionDataset.new_without_timeseries().add_fips_static_df(self.data)
 
-        raise ValueError("Unexpected index fields")
+    @classmethod
+    def _remove_unknown_fields(cls, df: pd.DataFrame):
+        unknown_columns = set(df.columns) - set(CommonFields)
+        _logger.info(f"Removing non-standard columns {unknown_columns}", source=cls.__name__)
+        return df.drop(unknown_columns, axis="columns")
 
     @classmethod
     def _rename_to_common_fields(cls: Type["DataSource"], df: pd.DataFrame) -> pd.DataFrame:
