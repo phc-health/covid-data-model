@@ -15,6 +15,7 @@ from api.can_api_v2_definition import AggregateRegionSummary
 from api.can_api_v2_definition import AggregateRegionSummaryWithTimeseries
 from api.can_api_v2_definition import Metrics
 from api.can_api_v2_definition import RegionSummaryWithTimeseries
+from api.can_api_v2_definition import RegionSummary
 from libs import dataset_deployer
 from libs.metrics import top_level_metrics
 from libs.metrics import top_level_metric_risk_levels
@@ -204,14 +205,28 @@ def deploy_single_level(
         output_path = path_builder.single_timeseries(timeseries, FileType.JSON)
         deploy_json_api_output(timeseries, output_path)
 
+    deploy_bulk_files(path_builder, all_timeseries, all_summaries)
+
+    if level is AggregationLevel.COUNTY:
+        for state in set(record.state for record in all_summaries):
+            state_timeseries = [record for record in all_timeseries if record.state == state]
+            state_summaries = [record for record in all_summaries if record.state == state]
+            deploy_bulk_files(path_builder, state_timeseries, state_summaries, state=state)
+
+
+def deploy_bulk_files(
+    path_builder,
+    all_timeseries: List[RegionSummaryWithTimeseries],
+    all_summaries: List[RegionSummary],
+    state: Optional[str] = None,
+):
+
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
-    start = time.time()
+    bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
+
     flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(bulk_timeseries)
-    duration = time.time() - start
-    logger.info(
-        f"Built bulk flattened timeseries in {duration} seconds", aggregate_level=level.value
-    )
-    output_path = path_builder.bulk_flattened_timeseries_data(FileType.CSV)
+
+    output_path = path_builder.bulk_flattened_timeseries_data(FileType.CSV, state=state)
     deploy_csv_api_output(
         flattened_timeseries,
         output_path,
@@ -226,14 +241,13 @@ def deploy_single_level(
         ],
     )
 
-    output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON)
+    output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON, state=state)
     deploy_json_api_output(bulk_timeseries, output_path)
 
-    bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
-    output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON)
+    output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON, state=state)
     deploy_json_api_output(bulk_summaries, output_path)
 
-    output_path = path_builder.bulk_summary(bulk_summaries, FileType.CSV)
+    output_path = path_builder.bulk_summary(bulk_summaries, FileType.CSV, state=state)
     deploy_csv_api_output(
         bulk_summaries,
         output_path,
