@@ -8,7 +8,7 @@ import structlog
 
 import pyseir.run
 from libs.metrics import test_positivity
-
+from libs import timing_utils
 from libs.pipelines.api_v2_paths import APIOutputPathBuilder
 from libs.pipelines.api_v2_paths import FileType
 from api.can_api_v2_definition import AggregateRegionSummary
@@ -221,44 +221,51 @@ def deploy_bulk_files(
     state: Optional[str] = None,
 ):
 
+    timing_kwargs = {"region_level": path_builder.level.value, "state": state}
+
     bulk_timeseries = AggregateRegionSummaryWithTimeseries(__root__=all_timeseries)
     bulk_summaries = AggregateRegionSummary(__root__=all_summaries)
 
-    flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(bulk_timeseries)
+    with timing_utils.time(f"Build bulk timeseries", **timing_kwargs):
+        flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(bulk_timeseries)
 
-    output_path = path_builder.bulk_flattened_timeseries_data(FileType.CSV, state=state)
-    deploy_csv_api_output(
-        flattened_timeseries,
-        output_path,
-        keys_to_skip=[
-            "actuals.date",
-            "metrics.date",
-            "annotations",
-            # TODO: Remove once solution to prevent order of CSV Columns from changing is done.
-            # https://trello.com/c/H8PPYLFD/818-preserve-ordering-of-csv-columns
-            "metrics.vaccinationsInitiatedRatio",
-            "metrics.vaccinationsCompletedRatio",
-        ],
-    )
+    with timing_utils.time(f"Bulk timeseries csv", **timing_kwargs):
+        output_path = path_builder.bulk_flattened_timeseries_data(FileType.CSV, state=state)
+        deploy_csv_api_output(
+            flattened_timeseries,
+            output_path,
+            keys_to_skip=[
+                "actuals.date",
+                "metrics.date",
+                "annotations",
+                # TODO: Remove once solution to prevent order of CSV Columns from changing is done.
+                # https://trello.com/c/H8PPYLFD/818-preserve-ordering-of-csv-columns
+                "metrics.vaccinationsInitiatedRatio",
+                "metrics.vaccinationsCompletedRatio",
+            ],
+        )
 
-    output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON, state=state)
-    deploy_json_api_output(bulk_timeseries, output_path)
+    with timing_utils.time(f"Bulk timeseries json", **timing_kwargs):
+        output_path = path_builder.bulk_timeseries(bulk_timeseries, FileType.JSON, state=state)
+        deploy_json_api_output(bulk_timeseries, output_path)
 
-    output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON, state=state)
-    deploy_json_api_output(bulk_summaries, output_path)
+    with timing_utils.time(f"Bulk summaries json", **timing_kwargs):
+        output_path = path_builder.bulk_summary(bulk_summaries, FileType.JSON, state=state)
+        deploy_json_api_output(bulk_summaries, output_path)
 
-    output_path = path_builder.bulk_summary(bulk_summaries, FileType.CSV, state=state)
-    deploy_csv_api_output(
-        bulk_summaries,
-        output_path,
-        keys_to_skip=[
-            "annotations",
-            # TODO: Remove once solution to prevent order of CSV Columns from changing is done.
-            # https://trello.com/c/H8PPYLFD/818-preserve-ordering-of-csv-columns
-            "metrics.vaccinationsInitiatedRatio",
-            "metrics.vaccinationsCompletedRatio",
-        ],
-    )
+    with timing_utils.time(f"Bulk summaries csv", **timing_kwargs):
+        output_path = path_builder.bulk_summary(bulk_summaries, FileType.CSV, state=state)
+        deploy_csv_api_output(
+            bulk_summaries,
+            output_path,
+            keys_to_skip=[
+                "annotations",
+                # TODO: Remove once solution to prevent order of CSV Columns from changing is done.
+                # https://trello.com/c/H8PPYLFD/818-preserve-ordering-of-csv-columns
+                "metrics.vaccinationsInitiatedRatio",
+                "metrics.vaccinationsCompletedRatio",
+            ],
+        )
 
 
 def deploy_json_api_output(region_result: pydantic.BaseModel, output_path: pathlib.Path) -> None:
