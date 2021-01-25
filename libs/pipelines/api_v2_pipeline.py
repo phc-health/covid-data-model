@@ -276,6 +276,26 @@ def deploy_json_api_output(region_result: pydantic.BaseModel, output_path: pathl
     output_path.write_text(serialized_result)
 
 
+def _model_to_dict(data: dict):
+    results = {}
+    for key, value in data.items():
+        if isinstance(value, pydantic.BaseModel):
+            value = _model_to_dict(value.__dict__)
+
+        if isinstance(value, list):
+            values = []
+            for item in value:
+                if isinstance(item, pydantic.BaseModel):
+                    value = _model_to_dict(item.__dict__)
+
+                values.append(value)
+            value = values
+
+        results[key] = value
+
+    return results
+
+
 def deploy_csv_api_output(
     api_output: pydantic.BaseModel,
     output_path: pathlib.Path,
@@ -284,7 +304,8 @@ def deploy_csv_api_output(
     if not hasattr(api_output, "__root__"):
         raise AssertionError("Missing root data")
 
-    rows = dataset_deployer.remove_root_wrapper(api_output.dict())
+    data = _model_to_dict(api_output.__dict__)
+    rows = dataset_deployer.remove_root_wrapper(data)
     dataset_deployer.write_nested_csv(rows, output_path, keys_to_skip=keys_to_skip)
 
 
