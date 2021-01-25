@@ -17,7 +17,7 @@
     },
     "currentUsageTotal": {
       "title": "Currentusagetotal",
-      "description": "Currently used capacity for resource by all patients (COVID + Non-COVID)",
+      "description": "Currently used capacity for resource by all patients (COVID + Non-COVID).",
       "anyOf": [
         {
           "type": "integer"
@@ -29,7 +29,7 @@
     },
     "currentUsageCovid": {
       "title": "Currentusagecovid",
-      "description": "Currently used capacity for resource by COVID ",
+      "description": "Currently used capacity for resource by COVID.",
       "anyOf": [
         {
           "type": "integer"

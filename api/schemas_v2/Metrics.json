@@ -96,6 +96,7 @@
     },
     "icuCapacityRatio": {
       "title": "Icucapacityratio",
+      "description": "\nRatio of staffed intensive care unit (ICU) beds that are currently in use.\n",
       "anyOf": [
         {
           "type": "number"
