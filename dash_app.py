@@ -33,10 +33,8 @@ def init_dashboard():
 
     # A table of regions in a DataFrame.
     df_regions = ds.static
-    df_regions["annotation_count"] = (
-        ds.tag.loc[
-            :, :, [TagType.CUMULATIVE_LONG_TAIL_TRUNCATED, TagType.CUMULATIVE_TAIL_TRUNCATED]
-        ]
+    df_regions["source_url_count"] = (
+        ds.tag.loc[:, :, [TagType.SOURCE_URL]]
         .index.get_level_values(CommonFields.LOCATION_ID)
         .value_counts()
     )
@@ -55,7 +53,7 @@ def init_dashboard():
                         CommonFields.COUNTY,
                         CommonFields.STATE,
                         CommonFields.POPULATION,
-                        "annotation_count",
+                        "source_url_count",
                     ]
                 ],
                 cell_selectable=False,
