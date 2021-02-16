@@ -3,9 +3,11 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import more_itertools
+import pandas as pd
 
 import plotly.express as px
 from covidactnow.datapublic.common_fields import CommonFields
+from covidactnow.datapublic.common_fields import PdFields
 from dash.dependencies import Input, Output
 
 from libs import pipeline
@@ -41,6 +43,33 @@ def init_dashboard():
     df_regions = df_regions.reset_index()  # Move location_id from the index to a regular column
     df_regions["id"] = df_regions[CommonFields.LOCATION_ID]
 
+    df_popular_urls = ds.tag.loc[:, :, TagType.SOURCE_URL].value_counts().reset_index()
+
+    wide_var_has_url = ds.tag.loc[:, :, TagType.SOURCE_URL].unstack(PdFields.VARIABLE).notnull()
+    wide_var_has_ts = (
+        ds.timeseries_wide_dates().notnull().any(1).unstack(PdFields.VARIABLE, fill_value=False)
+    )
+
+    def location_id_to_report_agg(loc_id):
+        region = pipeline.Region.from_location_id(loc_id)
+        if region.is_county():
+            return region.state
+        else:
+            return region.level.value
+
+    agg_ts_counts = wide_var_has_ts.groupby(location_id_to_report_agg).sum().astype(int)
+    agg_ts_counts = agg_ts_counts.reindex(
+        columns=pd.Index(CommonFields).intersection(agg_ts_counts.columns)
+    )
+    agg_url_counts = (
+        wide_var_has_url.groupby(location_id_to_report_agg)
+        .sum()
+        .astype(int)
+        .reindex(columns=agg_ts_counts.columns, index=agg_ts_counts.index, fill_value=0)
+    )
+
+    combined_counts = (agg_url_counts.astype(str) + " / " + agg_ts_counts.astype(str)).reset_index()
+
     app.layout = html.Div(
         children=[
             html.H1(children="CAN Data Pipeline Dashboard"),
@@ -73,6 +102,29 @@ def init_dashboard():
             dcc.Graph(id="region-graph",),
             dash_table.DataTable(
                 id="region-tag-table", columns=[{"name": i, "id": i} for i in TAG_TABLE_COLUMNS]
+            ),
+            html.Hr(),
+            dash_table.DataTable(
+                id="source_url_counts",
+                columns=[{"name": i, "id": i} for i in ["index", "content",]],
+                cell_selectable=False,
+                page_size=8,
+                data=df_popular_urls.to_dict("records"),
+                editable=False,
+                filter_action="native",
+                sort_action="native",
+                sort_mode="multi",
+                page_action="native",
+                style_table={"height": "300px", "overflowY": "auto"},
+            ),
+            html.Hr(),
+            dash_table.DataTable(
+                id="combined_counts",
+                columns=[{"name": i, "id": i} for i in combined_counts.columns],
+                cell_selectable=False,
+                data=combined_counts.to_dict("records"),
+                editable=False,
+                page_action="native",
             ),
         ]
     )
