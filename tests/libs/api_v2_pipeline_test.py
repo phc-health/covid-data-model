@@ -96,6 +96,7 @@ def test_build_api_output_for_intervention(nyc_regional_input, tmp_path):
         "counties.json",
         "county/36061.json",
         "county/36061.timeseries.json",
+        "county/36061.timeseries.csv",
         "county/NY.timeseries.json",
         "county/NY.timeseries.csv",
         "county/NY.json",

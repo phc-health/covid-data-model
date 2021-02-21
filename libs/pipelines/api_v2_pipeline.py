@@ -203,6 +203,18 @@ def deploy_single_level(
         output_path = path_builder.single_timeseries(timeseries, FileType.JSON)
         deploy_json_api_output(timeseries, output_path)
 
+        output_path = path_builder.single_timeseries(timeseries, FileType.CSV)
+        flattened_timeseries = build_api_v2.build_bulk_flattened_timeseries(
+            # AggregateRegionSummaryWithTimeseries is needed to flatten appropriately
+            AggregateRegionSummaryWithTimeseries(__root__=[timeseries])
+        )
+
+        deploy_csv_api_output(
+            flattened_timeseries,
+            output_path,
+            keys_to_skip=["actuals.date", "metrics.date", "annotations",],
+        )
+
     deploy_bulk_files(path_builder, all_timeseries, all_summaries)
 
     if level is AggregationLevel.COUNTY:
