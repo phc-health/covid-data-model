@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
+import TextField from "@material-ui/core/TextField";
 
 import {
   InputHolder,
@@ -8,24 +9,25 @@ import {
   ApiKey,
   InputError,
 } from "@site/src/components/SignupForm.style";
+import { Grid } from "@material-ui/core";
 
 // Taken from https://ui.dev/validate-email-address-javascript/
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const trackEmailSignupSuccess = (isNewUser) => {
-  ga('send', {
-    hitType: 'event',
-    eventCategory: 'API Register',
-    eventAction: 'Submit',
-    eventLabel: isNewUser ? 'New User' : 'Existing User'
+  ga("send", {
+    hitType: "event",
+    eventCategory: "API Register",
+    eventAction: "Submit",
+    eventLabel: isNewUser ? "New User" : "Existing User",
   });
-}
+};
 
 const SignupForm = () => {
   const [email, setEmail] = useState();
   const [apiKey, setApiKey] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const {siteConfig} = useDocusaurusContext();
+  const { siteConfig } = useDocusaurusContext();
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -51,26 +53,88 @@ const SignupForm = () => {
 
   return (
     <GettingStartedBox>
-      <p>There are just two fast and simple steps before using our API.</p>
+      <p>
+        There are just 3 questions we’d liked answered, and then you can
+        immediately get started.{" "}
+      </p>
 
       <div>
-        <h3>1. Get your API key</h3>
         <StyledNewsletter>
           <form>
-            <InputHolder>
-              <input
-                autoComplete="Email"
-                aria-label="Email"
-                placeholder="Enter your email address"
-                id="fieldEmail"
-                maxLength="200"
-                type="email"
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <button type="submit" onClick={(e) => onSubmit(e)}>
-                Get API key
-              </button>
-            </InputHolder>
+            <Grid container spacing={4}>
+              <Grid container item xs={12}>
+                <Grid item xs={12}>
+                  <h5>Email address</h5>
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    autoComplete="Email"
+                    label="Email"
+                    variant="outlined"
+                    aria-label="Email"
+                    required
+                    fullWidth
+                    id="fieldEmail"
+                    type="email"
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </Grid>
+              </Grid>
+              <Grid container item xs={12}>
+                <Grid item xs={12}>
+                  <h5>Organization name</h5>
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    autoComplete="Organization"
+                    aria-label="Organization"
+                    fullWidth
+                    variant="outlined"
+                    label="Organization name"
+                    id="fieldOrganization"
+                    required
+                  />
+                </Grid>
+              </Grid>
+
+              <Grid container item xs={12}>
+                <Grid item xs={12}>
+                  <h5>How do you intend to our data?</h5>
+                </Grid>
+                <Grid item xs={12}>
+                  <span>It’s optional, but it’s helpful for us to know:</span>
+                  <ul>
+                    <li>
+                      The data/metrics you’re interested in (e.g. vaccine data,
+                      risk levels, cases, deaths, etc.)
+                    </li>
+                    <li>
+                      The locations you’d like to use this for (e.g. all 50
+                      states, counties in the Florida panhandle, or just Cook
+                      County, IL)
+                    </li>
+                    <li>How will this data be used to help people?</li>
+                  </ul>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    aria-label="How you are using the data"
+                    placeholder="How are you using the data"
+                    label="Use Case"
+                    id="fieldUseCase"
+                    type="email"
+                    rows={5}
+                    variant="outlined"
+                    fullWidth
+                    multiline
+                  />
+                </Grid>
+              </Grid>
+            </Grid>
+
+            <button type="submit" onClick={(e) => onSubmit(e)}>
+              Get API key
+            </button>
             {errorMessage && <InputError>{errorMessage}</InputError>}
           </form>
         </StyledNewsletter>
@@ -86,17 +150,6 @@ const SignupForm = () => {
           </p>
         )}
       </div>
-      <h3>
-        2. Complete the{" "}
-        <a
-          href="https://docs.google.com/forms/d/e/1FAIpQLSf15Qx2EdYUHUmNI2JBts4LbVqIxsLN1SEzZLJlwuWdfJ4dVg/viewform?usp=sf_link"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          registration form
-        </a>
-      </h3>
-      <p>This helps establish a relationship between us for better support.</p>
     </GettingStartedBox>
   );
 };
