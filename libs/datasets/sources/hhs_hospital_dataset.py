@@ -77,7 +77,10 @@ class HHSHospitalCountyDataset(data_source.CanScraperBase):
 def modify_dataset(ds: MultiRegionDataset) -> MultiRegionDataset:
     ts_copy = ds.timeseries.copy()
 
-    return dataclasses.replace(ds, timeseries=filter_early_data(ts_copy), timeseries_bucketed=None)
+    filtered_ds = dataclasses.replace(
+        ds, timeseries=filter_early_data(ts_copy), timeseries_bucketed=None
+    )
+    return filtered_ds.add_static_values()
 
 
 def filter_early_data(df):
