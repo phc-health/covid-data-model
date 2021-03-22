@@ -3,13 +3,13 @@
   "path": "data/multiregion.csv",
   "data_git_info": {
     "sha": "112c368fde0bb3f553e03342e05867fdc220d6b1",
-    "branch": "main",
+    "branch": "detached",
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "ecee5f2f94db771f135367c3f160fe47a2758fb2",
-    "branch": "main",
+    "sha": "cd47ba13b77747a0d43e9e5db6507efc5bc32f25",
+    "branch": "detached",
     "is_dirty": false
   },
-  "updated_at": "2021-03-14T07:48:39.970577"
+  "updated_at": "2021-03-22T02:41:28.662534"
 }
