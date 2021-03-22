@@ -2,14 +2,14 @@
   "dataset_type": "multiregion",
   "path": "data/multiregion.csv",
   "data_git_info": {
-    "sha": "7908885b234ab2fcd098de62bbc9ab0f0dbbaac0",
-    "branch": "main",
+    "sha": "112c368fde0bb3f553e03342e05867fdc220d6b1",
+    "branch": "detached",
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "cd47ba13b77747a0d43e9e5db6507efc5bc32f25",
-    "branch": "main",
-    "is_dirty": false
+    "sha": "f29e48928305f528370821da4b5068b02de4365d",
+    "branch": "mikelehen-hhs-hospital-source-test",
+    "is_dirty": true
   },
-  "updated_at": "2021-03-14T11:56:11.152130"
+  "updated_at": "2021-03-22T01:29:20.991231"
 }
