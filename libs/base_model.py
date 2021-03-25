@@ -2,8 +2,19 @@ import pydantic
 import simplejson
 
 
-def _nan_safe_json_dumps(*args, **kwargs):
-    return simplejson.dumps(*args, **kwargs, ignore_nan=True)
+def rounded_floats(obj, decimals=5):
+    if isinstance(obj, float):
+        return round(obj, decimals)
+    elif isinstance(obj, dict):
+        return dict((k, rounded_floats(v)) for k, v in obj.items())
+    elif isinstance(obj, (list, tuple)):
+        return [rounded_floats(o) for o in obj]
+    return obj
+
+
+def _nan_safe_json_dumps(data, *args, **kwargs):
+    data = rounded_floats(data)
+    return simplejson.dumps(data, *args, **kwargs, ignore_nan=True)
 
 
 class APIBaseModel(pydantic.BaseModel):
