@@ -5,10 +5,10 @@ setup-dev: requirements.txt requirements_test.txt
 	pre-commit install
 
 unittest:
-	pytest -n 2 tests/
+	pytest -n 1 tests/
 
 unittest-not-slow:
-	pytest -k 'not slow' -n 2 --durations=5 tests/
+	pytest -k 'not slow' -n 1 --durations=5 tests/
 
 lint:
 	pytest --pylint -m pylint --pylint-jobs=2 .
