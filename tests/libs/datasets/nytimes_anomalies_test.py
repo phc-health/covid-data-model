@@ -1,15 +1,11 @@
 import numpy as np
-import pytest
-import pandas as pd
 from covidactnow.datapublic.common_fields import CommonFields
-from covidactnow.datapublic.common_fields import DemographicBucket
 
 from tests import test_helpers
 from tests.test_helpers import TimeseriesLiteral
 from libs.datasets import nytimes_anomalies
 from libs.datasets.taglib import TagType
 from libs.pipeline import Region
-import datetime
 
 
 def test_read_nytimes_anomalies():
