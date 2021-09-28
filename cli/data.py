@@ -172,10 +172,10 @@ def update(
     if print_stats:
         multiregion_dataset.print_stats("nytimes_anomalies")
 
-    multiregion_dataset = outlier_detection.drop_new_case_outliers(multiregion_dataset)
-    multiregion_dataset = outlier_detection.drop_new_deaths_outliers(multiregion_dataset)
-    if print_stats:
-        multiregion_dataset.print_stats("outlier_detection")
+    # multiregion_dataset = outlier_detection.drop_new_case_outliers(multiregion_dataset)
+    # multiregion_dataset = outlier_detection.drop_new_deaths_outliers(multiregion_dataset)
+    # if print_stats:
+    #    multiregion_dataset.print_stats("outlier_detection")
 
     multiregion_dataset = timeseries.drop_regions_without_population(
         multiregion_dataset, KNOWN_LOCATION_ID_WITHOUT_POPULATION, structlog.get_logger()
