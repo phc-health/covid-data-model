@@ -2,14 +2,14 @@
   "dataset_type": "multiregion",
   "path": "data/multiregion.csv",
   "data_git_info": {
-    "sha": "34ce9677de2257ea35c8ccc40334f51317553145",
+    "sha": "df1dc816f909da1856f670a4bb72ba9cb74ac542",
     "branch": "main",
     "is_dirty": false
   },
   "model_git_info": {
-    "sha": "764b902674801d32f23950e5c69a5fce496d3f63",
-    "branch": "mikelehen-nyt-anomalies",
+    "sha": "0010cc4475e84dbc56f3d1c71ccc733d8e983d84",
+    "branch": "mikelehen-drop-outlier-detection",
     "is_dirty": true
   },
-  "updated_at": "2021-09-28T02:41:39.139182"
+  "updated_at": "2021-09-28T19:23:51.471283"
 }
