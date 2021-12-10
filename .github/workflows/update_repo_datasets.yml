@@ -12,7 +12,7 @@ on:
 
 env:
   # To pin to an old data sets, put the branch/tag/commit here:
-  COVID_DATA_PUBLIC_REF: 'main'
+  COVID_DATA_PUBLIC_REF: '1138c5e6ccce5942d3933bbdced7f8b028bfcf0c'
 
   # Used by python code that reports errors to sentry.
   SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
