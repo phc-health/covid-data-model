@@ -92,8 +92,8 @@ jobs:
 
     - name: Build Model Results (run.sh .. .. execute_model)
       run: |
-        ./run.py utils download-model-artifact 2827
+        ./covid-data-model/run.py utils download-model-artifact 2827
 
     - name: Build API (run.sh .. .. execute_api)
       run: |
-        ./run.py api generate-api-v2 --fips 31049 api-results-2827
+        ./covid-data-model/run.py api generate-api-v2 --fips 31049 api-results-2827
