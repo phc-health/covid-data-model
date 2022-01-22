@@ -223,8 +223,7 @@ CDCNewVaccinesCompletedBoosterCountiesWithoutExceptions = datasource_regions(
 # often just barely above 2nd dose data, making it suspicious. So we're just blocking
 # it outright.
 CDCNewVaccinesInitiatedCountiesWithoutExceptions = datasource_regions(
-    CDCNewVaccinesCountiesDataset,
-    exclude=[CDC_STATE_EXCLUSIONS, *CDC_COUNTY_EXCLUSIONS, NE_COUNTIES],
+    CDCNewVaccinesCountiesDataset, exclude=[CDC_STATE_EXCLUSIONS, *CDC_COUNTY_EXCLUSIONS],
 )
 
 # Excludes FL counties for vaccine fields. See
