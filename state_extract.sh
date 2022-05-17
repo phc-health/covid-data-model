@@ -29,5 +29,5 @@ echo $gcs_bucket
 
 today_date=$(date '+%Y-%m-%d')
 
-gsutil cp output/api/states.timeseries.csv phc-can-internal/state/${today_date}/
-gsutil cp output/api/states.timeseries.csv phc-can-internal/county/${today_date}/
+gsutil cp output/api/states.timeseries.csv ${gcs_bucket}/phc-can-internal/state/${today_date}/
+gsutil cp output/api/states.timeseries.csv ${gcs_bucket}/phc-can-internal/county/${today_date}/
