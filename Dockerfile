@@ -18,7 +18,7 @@ RUN \
 
 COPY . .
 
-RUN /opt/venv/covid-data-model/bin/pip3 install .
+RUN pip3 install .
 RUN chmod +x state_extract.sh
 
 ENTRYPOINT ["./state_extract.sh"]
