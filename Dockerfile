@@ -14,8 +14,9 @@ COPY setup.py .
 RUN \
   python3 -m venv /opt/venv/covid-data-model && \
   . /opt/venv/covid-data-model/bin/activate && \
-  pip3 install -r requirements.txt
-  
+  pip3 install -r requirements.txt && \
+  pip3 install google-cloud-storage fsspec gcsfs
+
 COPY . .
 
 RUN pip3 install .
