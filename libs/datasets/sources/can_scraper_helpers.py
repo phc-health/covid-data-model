@@ -17,13 +17,12 @@ from libs.dataclass_utils import dataclass_with_default_init
 from libs.datasets import dataset_utils
 from libs.datasets import taglib
 from libs.datasets.demographics import DistributionBucket
-
+from decouple import config
 
 # Airflow jobs output a single parquet file with all of the data - this is where
 # it is currently stored.
-GCS_PARQUET_PATH = (
-    "https://storage.googleapis.com/can-scrape-outputs/final/can_scrape_api_covid_us.parquet"
-)
+
+GCS_PARQUET_PATH = config('GCS_PARQUET_PATH', default="https://storage.googleapis.com/can-scrape-outputs/final/can_scrape_api_covid_us.parquet")
 
 _logger = structlog.getLogger()
 
