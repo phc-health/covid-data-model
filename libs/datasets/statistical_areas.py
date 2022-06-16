@@ -127,6 +127,7 @@ class CountyToHSAAggregator:
         self,
         dataset_in: MultiRegionDataset,
         fields_to_aggregate: Dict[CommonFields, CommonFields] = HSA_FIELDS_MAPPING,
+        restrict_to_current_state: Region = None,
     ) -> MultiRegionDataset:
         """Create new fields by aggregating county-level data into HSA level data. 
         
@@ -172,4 +173,15 @@ class CountyToHSAAggregator:
         assert not set(aggregated_ts.columns) & set(dataset_in.timeseries_bucketed.columns)
         out_ts = dataset_in.timeseries_bucketed.combine_first(aggregated_ts)
         out_ds = dataclasses.replace(dataset_in, timeseries_bucketed=out_ts)
+
+        if restrict_to_current_state:
+            assert restrict_to_current_state.is_state()
+            state = restrict_to_current_state
+            out_ds, other_locs = out_ds.partition_by_region(
+                include=[
+                    state,
+                    pipeline.RegionMask(states=[state.state], level=AggregationLevel.COUNTY),
+                ]
+            )
+            return out_ds
         return out_ds
