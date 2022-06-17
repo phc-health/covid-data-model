@@ -15,7 +15,11 @@ RUN \
   python3 -m venv /opt/venv/covid-data-model && \
   . /opt/venv/covid-data-model/bin/activate && \
   pip3 install -r requirements.txt
-  
+
 COPY . .
 
 RUN pip3 install .
+RUN chmod +x state_extract.sh
+
+ENTRYPOINT ["./state_extract.sh"]
+CMD ["CL", "gs://test-bucket"]
