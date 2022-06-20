@@ -1,18 +1,30 @@
-# In this directory, run the following command to build this builder.
-# $ gcloud builds submit
-
 steps:
+- id: build
+  name: ${_BUILD_IMAGE}
+  entrypoint: /bin/bash
+  env:
+    - 'DOCKER_BUILDKIT=1'
+  args:
+    - '-c'
+    - |-
+      set -e # Fail if any command below fails
+      docker build --tag=${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA} .
+      docker push ${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA}
 
-- name: 'gcr.io/cloud-builders/docker'
-  entrypoint: 'bash'
+- id: tag_latest_if_main
+  name: ${_BUILD_IMAGE}
+  entrypoint: /bin/bash
   args:
   - '-c'
-  - |
-    set -e  # Fail if any command below fails
-    docker build \
-    --tag=us-docker.pkg.dev/$PROJECT_ID/docker/covid-data-model:${SHORT_SHA} \
-    --tag=us-docker.pkg.dev/$PROJECT_ID/docker/covid-data-model:latest .
+  - |-
+    set -e # Fail if any command below fails
+    [[ $BRANCH_NAME == 'main' ]] || exit 0
+    docker tag ${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA} ${_BASE_REPO}/${_IMAGE_PATH}:latest
+    docker push ${_BASE_REPO}/${_IMAGE_PATH}:latest
+  waitFor:
+  - build
 
-images:
-  - 'us-docker.pkg.dev/$PROJECT_ID/docker/covid-data-model:$SHORT_SHA'
-  - 'us-docker.pkg.dev/$PROJECT_ID/docker/covid-data-model:latest'
+substitutions:
+  _BASE_REPO: us-docker.pkg.dev/project-pluto-324014/docker
+  _BUILD_IMAGE: gcr.io/cloud-builders/docker:20.10.14
+  _IMAGE_PATH: covid-data-model

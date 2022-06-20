@@ -22,7 +22,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 WORKDIR /covid-data-model
 
-COPY requirements.txt setup.py .
+COPY requirements.txt setup.py ./
 
 RUN pip install -r requirements.txt
 RUN pip install google-cloud-storage fsspec gcsfs python-decouple ipython
