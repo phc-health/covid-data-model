@@ -1,7 +1,10 @@
+---
+timeout: 1800s
 steps:
 - id: build
   name: ${_BUILD_IMAGE}
   entrypoint: /bin/bash
+  timeout: 1200s
   env:
     - 'DOCKER_BUILDKIT=1'
   args:
@@ -9,7 +12,6 @@ steps:
     - |-
       set -e # Fail if any command below fails
       docker build --tag=${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA} .
-      docker push ${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA}
 
 - id: tag_latest_if_main
   name: ${_BUILD_IMAGE}
@@ -23,6 +25,9 @@ steps:
     docker push ${_BASE_REPO}/${_IMAGE_PATH}:latest
   waitFor:
   - build
+
+images:
+  - '${_BASE_REPO}/${_IMAGE_PATH}:${SHORT_SHA}'
 
 substitutions:
   _BASE_REPO: us-docker.pkg.dev/project-pluto-324014/docker

@@ -31,6 +31,7 @@ main() {
 
   today_date=$(date -I)
   upload_path="gs://${GCS_STORAGE_BUCKET}/${GCS_BUCKET_PREFIX}/${today_date}/"
+  rolling_upload_path="gs://${GCS_STORAGE_BUCKET}/${GCS_BUCKET_PREFIX}/"
   warn "GCS Upload Path: ${upload_path}"
 
   output_dir="${base_dir}/output"
@@ -78,10 +79,11 @@ main() {
     log_step
   }
 
-  step="Publishing to $upload_path"
+  step="Publishing to $upload_path and $rolling_upload_path"
   time {
     log_step
     find "$DATA_OUTPUT_DIR" -regextype egrep -regex "$UPLOAD_FILE_FILTER" | gsutil -m cp -I "$upload_path"
+    find "$DATA_OUTPUT_DIR" -regextype egrep -regex "$UPLOAD_FILE_FILTER" | gsutil -m cp -I "$rolling_upload_path"
     log_step
   }
 }
