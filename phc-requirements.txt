@@ -1,0 +1,7 @@
+google-cloud-storage
+fsspec
+gcsfs
+python-decouple
+
+# must match deployed prefect version
+prefect[google,kubernetes]==1.2.2

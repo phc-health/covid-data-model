@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.7-slim-bullseye as deps-image
+FROM --platform=linux/amd64 python:3.7-slim-bullseye
 
 RUN \
   apt-get -y update && \
@@ -28,9 +28,10 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 WORKDIR /covid-data-model
 
 COPY requirements.txt setup.py ./
-
 RUN pip install -r requirements.txt
-RUN pip install google-cloud-storage fsspec gcsfs python-decouple ipython
+
+COPY phc-requirements.txt ./
+RUN pip install -r phc-requirements.txt
 
 COPY . .
 RUN pip install -e .
